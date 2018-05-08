@@ -1,0 +1,7 @@
+*.d
+*.o
+*.so
+__pycache__
+.DS_Store
+._*
+libco_from_git
