@@ -16,14 +16,14 @@ LIBCO_TARGET = $(LIBCO_DIR)/lib/libcolib.a
 LIBCO_GIT_URL = https://github.com/Tencent/libco.git
 
 # flags
-CFLAGS += -Wall -g -I../cheaders -I$(LICENSE_DIR)/src -fPIC -lpthread $(OPENSSL_CFLAGS)
-CPPFLAGS += -Wall -fpermissive -g -I../cheaders -I$(LICENSE_DIR)/src -fPIC -lpthread $(OPENSSL_CFLAGS)
+CFLAGS += -Wall -g -fPIC -lpthread -I./include -levent
+CPPFLAGS += -Wall -g -fPIC -lpthread -I./include -levent
 LDFLAGS += -lpthread -lm -lrt
 
 # source files
-C_SRCS = $(wildcard *.c)
-CPP_SRCS = $(wildcard *.cpp) $(LICENSE_DIR)/src/hashmd5.cpp $(LICENSE_DIR)/src/SSLKernelItem.cpp
-ASM_SRCS = $(wildcard *.S)
+C_SRCS = $(wildcard ./src/*.c)
+CPP_SRCS = $(wildcard ./src/*.cpp)
+ASM_SRCS = $(wildcard ./src/*.S)
 
 C_OBJS = $(C_SRCS:.c=.o)
 CPP_OBJS = $(CPP_SRCS:.cpp=.o)
@@ -47,8 +47,16 @@ export LD
 
 # default target
 .PHONY:all
-all: $(BIN_DIR) $(TARGET_SO) $(TARGET_A)
-	@echo "	<< $(shell basename `pwd`) made >>"
+all: $(TARGET_SO) #$(TARGET_A)
+	@echo "	<< libcoevent made >>"
+
+# libcoevent
+$(TARGET_SO): $(BIN_DIR) $(C_OBJS) $(CPP_OBJS) $(ASM_OBJS)
+	@echo "deps = "$^
+	$(FINAL_CC) -o $@ $(CPP_OBJS) $(CPPFLAGS) -shared
+
+$(BIN_DIR):
+	mkdir $(BIN_DIR)
 
 # libco
 $(LIBCO_DIR):
