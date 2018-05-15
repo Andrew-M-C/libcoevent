@@ -4,6 +4,7 @@ MAKE = make
 CC  = gcc
 CPP = g++
 LD  = ld
+AR  = ar
 
 # target
 TARGET_SO = bin/libcoevent.so
@@ -15,9 +16,9 @@ LIBCO_DIR = ./libco_from_git
 LIBCO_TARGET = $(LIBCO_DIR)/lib/libcolib.a
 LIBCO_GIT_URL = https://github.com/Tencent/libco.git
 
-# flags
-CFLAGS += -Wall -g -fPIC -lpthread -I./include -levent
-CPPFLAGS += -Wall -g -fPIC -lpthread -I./include -levent
+# flagsst 
+CFLAGS += -Wall -g -fPIC -lpthread -I./include -I./src -levent -DDEBUG_FLAG
+CPPFLAGS += -Wall -g -fPIC -lpthread -I./include -I./src -levent -DDEBUG_FLAG
 LDFLAGS += -lpthread -lm -lrt
 
 # source files
@@ -47,13 +48,17 @@ export LD
 
 # default target
 .PHONY:all
-all: $(TARGET_SO) #$(TARGET_A)
+all: $(TARGET_SO) $(TARGET_A)
 	@echo "	<< libcoevent made >>"
 
 # libcoevent
 $(TARGET_SO): $(BIN_DIR) $(C_OBJS) $(CPP_OBJS) $(ASM_OBJS)
 	@echo "deps = "$^
 	$(FINAL_CC) -o $@ $(CPP_OBJS) $(CPPFLAGS) -shared
+
+$(TARGET_A): $(BIN_DIR) $(C_OBJS) $(CPP_OBJS) $(ASM_OBJS)
+	@echo "deps = "$^
+	$(AR) r $@ $(C_OBJS) $(CPP_OBJS) $(ASM_OBJS)
 
 $(BIN_DIR):
 	mkdir $(BIN_DIR)
@@ -99,7 +104,9 @@ $(ASM_OBJS): $(ASM_OBJS:.o=.S)
 .PHONY: clean
 clean:
 #	@rm -f $(C_OBJS) $(CPP_OBJS) $(PROG_NAME) clist.txt cpplist.txt *.d *.d.* *.o
-	-make clean -C $(LIBCO_DIR)
+	-@if [ -d $(LIBCO_DIR) ]; then\
+		make clean -C $(LIBCO_DIR);\
+	fi
 	-@find -name '*.o' | xargs -I [] rm [] >> /dev/null
 	-@find -name '*.d' | xargs -I [] rm [] >> /dev/null
 #	-@find -name '*.so' | xargs -I [] rm [] >> /dev/null
@@ -110,9 +117,8 @@ clean:
 distclean: clean
 	rm -rf $(LIBCO_DIR)
 
-
-
 .PHONY: test
 test:
-	@echo 'test'
+	@echo 'Now build test programs'
+	make -C test/server
 

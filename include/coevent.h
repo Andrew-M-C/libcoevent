@@ -65,8 +65,8 @@ public:
 // event of libcoevent
 class Event {
 public:
-    Event(){}
-    ~Event(){}
+    Event();
+    ~Event();
 };
 
 }   // end of namespace libcoevent

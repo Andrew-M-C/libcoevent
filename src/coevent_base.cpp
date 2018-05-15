@@ -6,7 +6,7 @@ using namespace andrewmc::libcoevent;
 
 // ==========
 #define __CO_EVENT_BASE
-#if 1
+#ifdef __CO_EVENT_BASE
 
 struct Error Base::run()
 {
@@ -30,5 +30,5 @@ struct Error Base::run()
     return ret_code;
 }
 
-#endif  // end of CoEventError
+#endif  // end of libcoevent::Base
 
