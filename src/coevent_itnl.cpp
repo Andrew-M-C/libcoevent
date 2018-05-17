@@ -12,8 +12,8 @@
 using namespace andrewmc::libcoevent;
 
 // ==========
-#define __CO_EVENT_PRINT
-#ifdef __CO_EVENT_PRINT
+#define __CO_EVENT_ITNL
+#ifdef __CO_EVENT_ITNL
 
 // reference: https://github.com/Andrew-M-C/Linux-Linux_Programming_Template/blob/master/AMCCommonLib.c
 ssize_t print(int fd, const char *format, ...)
@@ -46,6 +46,51 @@ ssize_t print(int fd, const char *format, ...)
     buff[dateLen + 1] = '\0';
 
     return (write(fd, buff, dateLen + 1));
+}
+
+
+struct timeval to_timeval(double seconds)
+{
+    struct timeval ret;
+    ret.tv_sec = (time_t)seconds;
+    ret.tv_usec = (suseconds_t)((seconds - ret.tv_sec) * 1000000);
+    return ret;
+}
+
+
+struct timeval to_timeval(float seconds)
+{
+    struct timeval ret;
+    ret.tv_sec = (time_t)seconds;
+    ret.tv_usec = (suseconds_t)((seconds - ret.tv_sec) * 1000000);
+    return ret;
+}
+
+
+struct timeval to_timeval(int seconds)
+{
+    struct timeval ret;
+    ret.tv_sec = (time_t)seconds;
+    ret.tv_usec = 0;
+    return ret;
+}
+
+
+struct timeval to_timeval(long seconds)
+{
+    struct timeval ret;
+    ret.tv_sec = (time_t)seconds;
+    ret.tv_usec = 0;
+    return ret;
+}
+
+
+double to_double(struct timeval &time)
+{
+    double ret;
+    ret = (double)(time.tv_sec);
+    ret += ((double)(time.tv_usec)) / 1000000.0;
+    return ret;
 }
 
 #endif  // end of libcoevent::print

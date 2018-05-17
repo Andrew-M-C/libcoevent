@@ -9,9 +9,9 @@ LD  = ld
 TARGET_BIN = server
 
 # flagsst 
-CFLAGS += -Wall -g -fPIC -lpthread -I../../include -I./ -levent -lcoevent -L../../bin/
+CFLAGS += -Wall -g -fPIC -lpthread -I../../include -I./
 CPPFLAGS += $(CFLAGS)
-LDFLAGS += -lpthread -lm -lrt -levent -lcoevent -L../../bin/
+LDFLAGS += -Wl,-Bstatic -lcoevent -L../../bin/ -Wl,-Bdynamic -lpthread -lm -lrt -levent
 
 # source files
 C_SRCS = $(wildcard ./*.c)
@@ -70,7 +70,7 @@ $(ASM_OBJS): $(ASM_OBJS:.o=.S)
 $(TARGET_BIN): $(C_OBJS) $(CPP_OBJS)
 	@echo "$(LD) -r -o $@.o *.o"
 	@$(LD) -r -o $@.o $(C_OBJS) $(CPP_OBJS)
-	$(CC) $@.o $(STATIC_LIBS) -o $@ $(LDFLAGS)
+	$(FINAL_CC) $@.o $(STATIC_LIBS) -o $@ $(LDFLAGS)
 	chmod +x $@
 
 .PHONY: clean

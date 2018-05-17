@@ -13,7 +13,8 @@ using namespace andrewmc::libcoevent;
 
 int main(int argc, char *argv[])
 {
-    LOG("Hello, libcoevent!");
+    Base *base = new Base;
+    LOG("Hello, libcoevent! Identifier: %s", base->identifier().c_str());
     return 0;
 }
 

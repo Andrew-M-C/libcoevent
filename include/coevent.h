@@ -14,6 +14,14 @@
 namespace andrewmc {
 namespace libcoevent {
 
+class Base;
+class Event;
+
+
+// coroutine function
+typedef void (*WorkerFunc)(evutil_socket_t, void *);
+
+
 // libcoevent use this structure to return error information
 struct Error {
 private:
@@ -26,6 +34,8 @@ public:
         _sys_errno(0),_lib_errno(0)
     {}
 
+    BOOL is_error();
+    BOOL is_ok();
     void set_sys_errno(int sys_errno);
     void set_app_errno(ErrCode_t lib_errno);
     void set_app_errno(ErrCode_t lib_errno, const char *c_err_msg);
@@ -39,34 +49,47 @@ public:
 class Base {
     // private implementations
 private:
-    struct event_base *_event_base;
+    struct event_base   *_event_base;
+    std::string         _identifier;
 
     // constructor and destructors
 public:
-    Base()
-    {
-        _event_base = event_base_new();
-        return;
-    }
-
-    ~Base()
-    {
-        if (_event_base) {
-            event_base_free(_event_base);
-            _event_base = NULL;
-        }
-        return;
-    }
-
+    Base();
+    ~Base();
+    struct event_base *event_base();
     struct Error run();
+    void set_identifier(std::string &identifier);
+    const std::string &identifier();
 };
 
 
 // event of libcoevent
 class Event {
+protected:
+    std::string     _identifier;
+    Base            *_owner_base;
+    struct event    *_event;
+    struct Error    _status;
 public:
     Event();
     ~Event();
+    void set_identifier(std::string &identifier);
+    const std::string &identifier();
+};
+
+
+// pure event, no network interfaces supported
+class TimerEvent : public Event {
+protected:
+    BOOL            _is_initialized;
+public:
+    TimerEvent();
+    ~TimerEvent();
+    TimerEvent(Base *base, WorkerFunc func, void *arg);
+    struct Error set_worker(Base *base, WorkerFunc func, void *arg);
+    void sleep(double seconds);
+private:
+    void _init();
 };
 
 }   // end of namespace libcoevent

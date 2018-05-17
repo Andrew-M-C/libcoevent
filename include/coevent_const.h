@@ -7,6 +7,18 @@
 #define NULL    ((void*)0)
 #endif
 
+
+#ifndef BOOL
+#define BOOL    int
+#endif
+
+
+#ifndef FALSE
+#define FALSE   (0)
+#define TRUE    (!FALSE)
+#endif
+
+
 namespace andrewmc {
 namespace libcoevent {
 
@@ -15,11 +27,10 @@ typedef enum {
     ERR_EVENT_BASE_NEW,
     ERR_EVENT_BASE_DISPATCH,
     ERR_EVENT_BASE_NO_EVENT_PANDING,
+    ERR_PARA_NULL,
 
     ERR_UNKNOWN     // should place at last
 } ErrCode_t;
-
-extern const char *g_error_msg_list[];
 
 }   // end of namespace libcoevent
 }   // end of namespace andrewmc

@@ -17,6 +17,7 @@ const char *g_error_msg_list[] = {
     "failed to create libevent base",
     "failed to dispatch libevent base",
     "no events were pending or active",
+    "necessary parameter is null",
 
     "unknown error"     // should place at last
 };
@@ -27,6 +28,18 @@ const char *g_error_msg_list[] = {
 // ==========
 #define __CO_EVENT_ERROR
 #if 1
+
+BOOL Error::is_error()
+{
+    return (0 != _sys_errno);
+}
+
+
+BOOL Error::is_ok()
+{
+    return (0 == _sys_errno);
+}
+
 
 void Error::set_sys_errno(int sys_errno)
 {
