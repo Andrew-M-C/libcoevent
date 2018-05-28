@@ -1,5 +1,6 @@
 
 #include "coevent.h"
+#include "coevent_itnl.h"
 #include <string>
 
 using namespace andrewmc::libcoevent;
@@ -10,14 +11,24 @@ using namespace andrewmc::libcoevent;
 
 Event::Event()
 {
-    _event = NULL;
     _owner_base = NULL;
+    _event = NULL;
 
-    char identifier[64];
-    sprintf(identifier, "licoevent event %p", this);
-    _identifier = identifier;
-
+    DEBUG("Create event");
     return;
+}
+
+
+Event::~Event()
+{
+    DEBUG("Delete %s", this->identifier().c_str());
+    return;
+}
+
+
+Base *Event::owner()
+{
+    return _owner_base;
 }
 
 
@@ -33,5 +44,12 @@ const std::string &Event::identifier()
     return _identifier;
 }
 
-#endif  // end of libcoevent::Base
+
+struct Error Event::status()
+{
+    return _status;
+}
+
+
+#endif  // end of libcoevent::Event
 

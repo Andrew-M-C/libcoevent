@@ -26,7 +26,9 @@ typedef enum {
     ERR_SUCCESS = 0,
     ERR_EVENT_BASE_NEW,
     ERR_EVENT_BASE_DISPATCH,
+    ERR_EVENT_EVENT_NEW,
     ERR_EVENT_BASE_NO_EVENT_PANDING,
+    ERR_LIBCO_CREATE,
     ERR_PARA_NULL,
 
     ERR_UNKNOWN     // should place at last

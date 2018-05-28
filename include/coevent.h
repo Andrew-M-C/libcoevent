@@ -10,6 +10,7 @@
 #include <errno.h>
 #include <string.h>
 #include <string>
+#include <set>
 
 namespace andrewmc {
 namespace libcoevent {
@@ -19,7 +20,7 @@ class Event;
 
 
 // coroutine function
-typedef void (*WorkerFunc)(evutil_socket_t, void *);
+typedef void (*WorkerFunc)(evutil_socket_t, Event *, void *);
 
 
 // libcoevent use this structure to return error information
@@ -51,6 +52,7 @@ class Base {
 private:
     struct event_base   *_event_base;
     std::string         _identifier;
+    std::set<Event *>   _events_under_control;  // User may put an event into a base, it will be deallocated automatically when this is not needed anymore.
 
     // constructor and destructors
 public:
@@ -60,6 +62,8 @@ public:
     struct Error run();
     void set_identifier(std::string &identifier);
     const std::string &identifier();
+    void put_event_under_control(Event *event);
+    void delete_event_under_control(Event *event);
 };
 
 
@@ -72,9 +76,11 @@ protected:
     struct Error    _status;
 public:
     Event();
-    ~Event();
+    virtual ~Event();
+    Base *owner();
     void set_identifier(std::string &identifier);
     const std::string &identifier();
+    struct Error status();
 };
 
 
@@ -82,14 +88,16 @@ public:
 class TimerEvent : public Event {
 protected:
     BOOL            _is_initialized;
+    void            *_event_arg;
 public:
     TimerEvent();
-    ~TimerEvent();
     TimerEvent(Base *base, WorkerFunc func, void *arg);
-    struct Error set_worker(Base *base, WorkerFunc func, void *arg);
-    void sleep(double seconds);
+    ~TimerEvent();
+    struct Error add_to_base(Base *base, WorkerFunc func, void *user_arg, BOOL auto_free = TRUE);
+    void sleep(double seconds);     // can ONLY be incoked inside coroutine
 private:
     void _init();
+    void _clear();
 };
 
 }   // end of namespace libcoevent

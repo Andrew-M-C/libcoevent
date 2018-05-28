@@ -11,7 +11,7 @@ TARGET_BIN = server
 # flagsst 
 CFLAGS += -Wall -g -fPIC -lpthread -I../../include -I./
 CPPFLAGS += $(CFLAGS)
-LDFLAGS += -Wl,-Bstatic -lcoevent -L../../bin/ -Wl,-Bdynamic -lpthread -lm -lrt -levent
+LDFLAGS += -Wl,-Bstatic -lcoevent -L../../bin/ -lcolib -L../../libco_from_git/lib -Wl,-Bdynamic -lpthread -lm -lrt -levent -ldl
 
 # source files
 C_SRCS = $(wildcard ./*.c)

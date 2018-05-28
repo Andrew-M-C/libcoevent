@@ -1,7 +1,9 @@
 
 #include "coevent.h"
+#include "coevent_itnl.h"
 #include <string>
 #include <stdio.h>
+#include <set>
 
 using namespace andrewmc::libcoevent;
 
@@ -23,10 +25,19 @@ Base::Base()
 
 Base::~Base()
 {
+    // free event base
     if (_event_base) {
         event_base_free(_event_base);
         _event_base = NULL;
     }
+
+    // free all events under control
+    for (std::set<Event *>::iterator it = _events_under_control.begin(); it != _events_under_control.end(); it ++)
+    {
+        delete *it;
+    }
+    _events_under_control.clear();
+
     return;
 }
 
@@ -71,6 +82,29 @@ const std::string &Base::identifier()
 {
     return _identifier;
 }
+
+
+void Base::put_event_under_control(Event *event)
+{
+    _events_under_control.insert(event);
+    return;
+}
+
+
+void Base::delete_event_under_control(Event *event)
+{
+    std::set<Event *>::iterator it = _events_under_control.find(event);
+    if (it != _events_under_control.end()) {
+        DEBUG("Delete event: %s", (*it)->identifier().c_str());
+        delete *it;
+        _events_under_control.erase(event);
+    }
+    else {
+        DEBUG("Event %s is not under control", event->identifier().c_str());
+    }
+    return;
+}
+
 
 #endif  // end of libcoevent::Base
 

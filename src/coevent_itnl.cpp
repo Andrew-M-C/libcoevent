@@ -16,7 +16,7 @@ using namespace andrewmc::libcoevent;
 #ifdef __CO_EVENT_ITNL
 
 // reference: https://github.com/Andrew-M-C/Linux-Linux_Programming_Template/blob/master/AMCCommonLib.c
-ssize_t print(int fd, const char *format, ...)
+ssize_t andrewmc::libcoevent::print(int fd, const char *format, ...)
 {
     char buff[CFG_PRINT_BUFF_SIZE];
     va_list vaList;
@@ -49,48 +49,74 @@ ssize_t print(int fd, const char *format, ...)
 }
 
 
-struct timeval to_timeval(double seconds)
+struct timeval andrewmc::libcoevent::to_timeval(double seconds)
 {
     struct timeval ret;
-    ret.tv_sec = (time_t)seconds;
-    ret.tv_usec = (suseconds_t)((seconds - ret.tv_sec) * 1000000);
+    if (seconds > 0) {
+        ret.tv_sec = (time_t)seconds;
+        ret.tv_usec = (suseconds_t)((seconds - ret.tv_sec) * 1000000);
+    }
     return ret;
 }
 
 
-struct timeval to_timeval(float seconds)
+struct timeval andrewmc::libcoevent::to_timeval(float seconds)
 {
     struct timeval ret;
-    ret.tv_sec = (time_t)seconds;
-    ret.tv_usec = (suseconds_t)((seconds - ret.tv_sec) * 1000000);
+    if (seconds > 0) {
+        ret.tv_sec = (time_t)seconds;
+        ret.tv_usec = (suseconds_t)((seconds - ret.tv_sec) * 1000000);
+    }
     return ret;
 }
 
 
-struct timeval to_timeval(int seconds)
+struct timeval andrewmc::libcoevent::to_timeval(int seconds)
 {
     struct timeval ret;
-    ret.tv_sec = (time_t)seconds;
-    ret.tv_usec = 0;
+    if (seconds > 0) {
+        ret.tv_sec = (time_t)seconds;
+        ret.tv_usec = 0;
+    }
     return ret;
 }
 
 
-struct timeval to_timeval(long seconds)
+struct timeval andrewmc::libcoevent::to_timeval(long seconds)
 {
     struct timeval ret;
-    ret.tv_sec = (time_t)seconds;
-    ret.tv_usec = 0;
+    if (seconds > 0) {
+        ret.tv_sec = (time_t)seconds;
+        ret.tv_usec = 0;
+    }
     return ret;
 }
 
 
-double to_double(struct timeval &time)
+double andrewmc::libcoevent::to_double(struct timeval &time)
 {
     double ret;
     ret = (double)(time.tv_sec);
     ret += ((double)(time.tv_usec)) / 1000000.0;
     return ret;
+}
+
+
+BOOL andrewmc::libcoevent::is_coroutine_end(const struct stCoRoutine_t *routine)
+{
+    if (routine) {
+        return (routine->cEnd) ? TRUE : FALSE;
+    }
+    return TRUE;
+}
+
+
+BOOL andrewmc::libcoevent::is_coroutine_started(const struct stCoRoutine_t *routine)
+{
+    if (routine) {
+        return (routine->cStart) ? TRUE : FALSE;
+    }
+    return FALSE;
 }
 
 #endif  // end of libcoevent::print

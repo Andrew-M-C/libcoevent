@@ -16,7 +16,9 @@ const char *g_error_msg_list[] = {
     "success",
     "failed to create libevent base",
     "failed to dispatch libevent base",
+    "failed to dispatch libevent event",
     "no events were pending or active",
+    "failed to create libco routine",
     "necessary parameter is null",
 
     "unknown error"     // should place at last

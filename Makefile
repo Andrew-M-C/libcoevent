@@ -7,18 +7,19 @@ LD  = ld
 AR  = ar
 
 # target
-TARGET_SO = bin/libcoevent.so
-TARGET_A = bin/libcoevent.a
+BIN_DIR = ./bin
+TARGET_SO = $(BIN_DIR)/libcoevent.so
+TARGET_A = $(BIN_DIR)/libcoevent.a
 
 # directories
-BIN_DIR = ./bin
 LIBCO_DIR = ./libco_from_git
-LIBCO_TARGET = $(LIBCO_DIR)/lib/libcolib.a
+LIBCO_BIN = $(LIBCO_DIR)/lib
+LIBCO_TARGET = $(LIBCO_BIN)/libcolib.a
 LIBCO_GIT_URL = https://github.com/Tencent/libco.git
 
 # flagsst 
-CFLAGS += -Wall -g -fPIC -lpthread -I./include -I./src -levent -DDEBUG_FLAG
-CPPFLAGS += -Wall -g -fPIC -lpthread -I./include -I./src -levent -DDEBUG_FLAG
+CFLAGS += -Wall -g -fPIC -lpthread -I./include -I./src -I./$(LIBCO_DIR) -levent -DDEBUG_FLAG
+CPPFLAGS += $(CFLAGS)
 LDFLAGS += -lpthread -lm -lrt
 
 # source files
@@ -48,7 +49,7 @@ export LD
 
 # default target
 .PHONY:all
-all: $(TARGET_SO) $(TARGET_A)
+all: $(LIBCO_TARGET) $(TARGET_SO) $(TARGET_A)
 	@echo "	<< libcoevent made >>"
 
 # libcoevent
@@ -115,7 +116,9 @@ clean:
 
 .PHONY: distclean
 distclean: clean
-	rm -rf $(LIBCO_DIR)
+	-@if [ -d $(LIBCO_DIR) ]; then\
+		rm -rf $(LIBCO_DIR);\
+	fi
 
 .PHONY: test
 test:
