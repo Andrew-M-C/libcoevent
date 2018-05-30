@@ -20,6 +20,7 @@ const char *g_error_msg_list[] = {
     "no events were pending or active",
     "failed to create libco routine",
     "necessary parameter is null",
+    "illegal network interface type",
 
     "unknown error"     // should place at last
 };
@@ -43,10 +44,36 @@ BOOL Error::is_ok()
 }
 
 
+void Error::set_ssize_t(ssize_t val)
+{
+    if (val >= 0) {
+        set_sys_errno(0);
+        _ssize_ret = val;
+    }
+    else {
+        set_sys_errno((int)val);
+    }
+}
+
+
+ssize_t Error::ssize()
+{
+    return _ssize_ret;
+}
+
+
+void Error::clear_err()
+{
+    set_sys_errno(0);
+    return;
+}
+
+
 void Error::set_sys_errno(int sys_errno)
 {
     _sys_errno = (uint16_t)sys_errno;
     _lib_errno = 0;
+    _ssize_ret = 0;
     _err_msg.clear();
     return;
 }
@@ -60,6 +87,7 @@ void Error::set_app_errno(ErrCode_t lib_errno, const char *c_err_msg)
 
     _sys_errno = (0 == lib_errno) ? 0 : 0xFFFF;
     _lib_errno = (uint16_t)lib_errno;
+    _ssize_ret = 0;
 
     if ((NULL == c_err_msg)
         || ('\0' == *c_err_msg))
@@ -105,7 +133,7 @@ const char *Error::get_c_err_msg()
 }
 
 
-uint32_t Error::get_err_code()
+uint32_t Error::err_code()
 {
     uint32_t ret = (uint32_t)_sys_errno;
     ret += ((uint32_t)_lib_errno) << 16;

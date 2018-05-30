@@ -144,7 +144,7 @@ void TimerEvent::_clear()
 }
 
 
-struct Error TimerEvent::add_to_base(Base *base, WorkerFunc func, void *user_arg, BOOL auto_free)
+struct Error TimerEvent::init(Base *base, WorkerFunc func, void *user_arg, BOOL auto_free)
 {
     if (NULL == base) {
         _status.set_app_errno(ERR_PARA_NULL);
@@ -188,14 +188,6 @@ struct Error TimerEvent::add_to_base(Base *base, WorkerFunc func, void *user_arg
 
     _status.set_sys_errno(0);
     return _status;
-}
-
-
-TimerEvent::TimerEvent(Base *base, WorkerFunc func, void *arg)
-{
-    _init();
-    add_to_base(base, func, arg);
-    return;
 }
 
 

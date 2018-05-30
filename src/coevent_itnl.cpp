@@ -8,6 +8,7 @@
 #include <stdarg.h>
 #include <time.h>
 #include <sys/time.h>
+#include <fcntl.h>
 
 using namespace andrewmc::libcoevent;
 
@@ -117,6 +118,20 @@ BOOL andrewmc::libcoevent::is_coroutine_started(const struct stCoRoutine_t *rout
         return (routine->cStart) ? TRUE : FALSE;
     }
     return FALSE;
+}
+
+
+int andrewmc::libcoevent::set_fd_nonblock(int fd)
+{
+    int flag = fcntl(fd, F_GETFL, 0);
+    if (flag >= 0)
+    {
+        return fcntl(fd, F_SETFL, flag | O_NONBLOCK);
+    }
+    else
+    {
+        return flag;
+    }
 }
 
 #endif  // end of libcoevent::print

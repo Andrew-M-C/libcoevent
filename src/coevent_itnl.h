@@ -36,6 +36,9 @@ double to_double(struct timeval &time);
 BOOL is_coroutine_end(const struct stCoRoutine_t *routine);
 BOOL is_coroutine_started(const struct stCoRoutine_t *routine);
 
+// fd settings
+int set_fd_nonblock(int fd);
+
 
 }   // end of namespace libcoevent
 }   // end of namespace andrewmc

@@ -12,11 +12,25 @@
 #include <string>
 #include <set>
 
+#include <sys/types.h>
+#include <sys/socket.h>
+#include <netinet/in.h>
+#include <sys/un.h>
+
 namespace andrewmc {
 namespace libcoevent {
 
 class Base;
 class Event;
+
+
+// network type
+typedef enum {
+    NetUnknown = 0,
+    NetIPv4,
+    NetIPv6,
+    NetLocal,
+} NetType_t;
 
 
 // coroutine function
@@ -28,21 +42,25 @@ struct Error {
 private:
     uint16_t _sys_errno;    // error defined in "errno.h"
     uint16_t _lib_errno;    // error defined by libcoevent in coevent_const.h
+    ssize_t  _ssize_ret;
     std::string _err_msg;
 
 public:
     Error():
-        _sys_errno(0),_lib_errno(0)
+        _sys_errno(0),_lib_errno(0),_ssize_ret(0)
     {}
 
     BOOL is_error();
     BOOL is_ok();
+    void set_ssize_t(ssize_t val);
+    ssize_t ssize();
+    void clear_err();
     void set_sys_errno(int sys_errno);
     void set_app_errno(ErrCode_t lib_errno);
     void set_app_errno(ErrCode_t lib_errno, const char *c_err_msg);
     void set_app_errno(ErrCode_t lib_errno, const std::string &err_msg);
     const char *get_c_err_msg();
-    uint32_t get_err_code();
+    uint32_t err_code();
 };
 
 
@@ -77,10 +95,12 @@ protected:
 public:
     Event();
     virtual ~Event();
-    Base *owner();
+
     void set_identifier(std::string &identifier);
     const std::string &identifier();
+
     struct Error status();
+    Base *owner();
 };
 
 
@@ -91,10 +111,48 @@ protected:
     void            *_event_arg;
 public:
     TimerEvent();
-    TimerEvent(Base *base, WorkerFunc func, void *arg);
     ~TimerEvent();
-    struct Error add_to_base(Base *base, WorkerFunc func, void *user_arg, BOOL auto_free = TRUE);
+    struct Error init(Base *base, WorkerFunc func, void *user_arg, BOOL auto_free = TRUE);
+
     void sleep(double seconds);     // can ONLY be incoked inside coroutine
+private:
+    void _init();
+    void _clear();
+};
+
+
+// UDP event
+class UDPEvent : public Event {
+protected:
+    void            *_event_arg;
+    int             _fd_ipv4;
+    int             _fd_ipv6;
+    int             _fd_unix;
+    struct sockaddr_in  _sockaddr_ipv4;
+    struct sockaddr_in6 _sockaddr_ipv6;
+    struct sockaddr_un  _sockaddr_unix;
+
+public:
+    UDPEvent();
+    ~UDPEvent();
+
+    struct Error init(Base *base, WorkerFunc func, const struct sockaddr *addr, socklen_t addr_len, void *user_arg = NULL, BOOL auto_free = TRUE);
+    struct Error init(Base *base, WorkerFunc func, const struct sockaddr &addr, socklen_t addr_len, void *user_arg = NULL, BOOL auto_free = TRUE);
+    struct Error init(Base *base, WorkerFunc func, NetType_t network_type, int bind_port = 0, void *user_arg = NULL, BOOL auto_free = TRUE);
+    struct Error init(Base *base, WorkerFunc func, const char *bind_path, void *user_arg = NULL, BOOL auto_free = TRUE);
+
+    void set_buffer_size(size_t size);
+    size_t buffer_size();
+
+    const std::string &client_addr();
+    const char *c_client_addr();
+    NetType_t network_type();
+    int port();
+
+    void sleep(double seconds);
+    struct Error recv(void **data_out, size_t *len_out, double timeout_seconds);
+    struct Error send(const void *data, size_t len);
+
 private:
     void _init();
     void _clear();

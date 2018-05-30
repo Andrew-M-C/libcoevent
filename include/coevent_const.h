@@ -30,6 +30,7 @@ typedef enum {
     ERR_EVENT_BASE_NO_EVENT_PANDING,
     ERR_LIBCO_CREATE,
     ERR_PARA_NULL,
+    ERR_NETWORK_TYPE_ILLEGAL,
 
     ERR_UNKNOWN     // should place at last
 } ErrCode_t;
