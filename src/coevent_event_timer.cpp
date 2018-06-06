@@ -191,10 +191,11 @@ struct Error TimerEvent::init(Base *base, WorkerFunc func, void *user_arg, BOOL 
 }
 
 
-void TimerEvent::sleep(double seconds)
+struct Error TimerEvent::sleep(double seconds)
 {
     if (seconds <= 0) {
-        return;
+        _status.clear_err();
+        return _status;
     }
     else {
         struct timeval sleep_time = to_timeval(seconds);
@@ -202,6 +203,9 @@ void TimerEvent::sleep(double seconds)
 
         evtimer_add(_event, &sleep_time);
         co_yield(arg->coroutine);
+
+        _status.clear_err();
+        return _status;
     }
 }
 

@@ -33,7 +33,7 @@ ssize_t andrewmc::libcoevent::print(int fd, const char *format, ...)
     if (pTime)
     {
         memcpy(&currTime, pTime, sizeof(currTime));
-        dateLen = sprintf(buff, "%04d-%02d-%02d,%02d:%02d:%02d.%06ld ", 
+        dateLen = sprintf(buff, "%04d-%02d-%02d, %02d:%02d:%02d.%06ld - ", 
                             currTime.tm_year + 1900, currTime.tm_mon + 1, currTime.tm_mday,
                             currTime.tm_hour, currTime.tm_min, currTime.tm_sec, currDayTime.tv_usec);
     }

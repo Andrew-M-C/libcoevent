@@ -18,9 +18,14 @@ const char *g_error_msg_list[] = {
     "failed to dispatch libevent base",
     "failed to dispatch libevent event",
     "no events were pending or active",
+
     "failed to create libco routine",
     "necessary parameter is null",
+
     "illegal network interface type",
+    "ilegal bind path",
+
+    "sleep action is interrupted",
 
     "unknown error"     // should place at last
 };

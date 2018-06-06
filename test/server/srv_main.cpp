@@ -7,6 +7,8 @@
 #include <stdlib.h>
 #include <stdarg.h>
 
+using namespace andrewmc::libcoevent;
+
 #define LOG(fmt, args...)   _print("SERVER: %s, %d: "fmt, __FILE__, __LINE__, ##args)
 static ssize_t _print(const char *format, ...)
 {
@@ -40,8 +42,6 @@ static ssize_t _print(const char *format, ...)
     return (write(1, buff, dateLen + 1));
 }
 
-using namespace andrewmc::libcoevent;
-
 
 // ==========
 #define __EVENTS
@@ -49,7 +49,7 @@ using namespace andrewmc::libcoevent;
 
 static void _time_routine(evutil_socket_t fd, Event *abs_event, void *arg)
 {
-    TimerEvent *event = (TimerEvent *)abs_event;
+    UDPEvent *event = (UDPEvent *)abs_event;
 
     LOG("Start");
     event->sleep(1);
@@ -72,10 +72,10 @@ static void _time_routine(evutil_socket_t fd, Event *abs_event, void *arg)
 int main(int argc, char *argv[])
 {
     Base *base = new Base;
-    TimerEvent *event = new TimerEvent;
-    LOG("Hello, libcoevent! Identifier: %s", base->identifier().c_str());
+    UDPEvent *event = new UDPEvent;
+    LOG("Hello, libcoevent! Base: %s", base->identifier().c_str());
 
-    event->add_to_base(base, _time_routine, NULL, TRUE);
+    event->init(base, _time_routine, NetIPv4);
     base->run();
 
     LOG("libcoevent base ends");
