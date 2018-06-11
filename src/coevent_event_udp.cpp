@@ -584,4 +584,37 @@ struct Error UDPEvent::recv(void *data_out, const size_t len_limit, size_t *len_
     return _status;
 }
 
+
+void UDPEvent::copy_client_addr(std::string &addr_str)
+{
+    if (_fd_ipv4)
+    {
+        char c_addr_str[INET_ADDRSTRLEN + 7];
+        char c_port_str[7];
+
+        inet_ntop(AF_INET, &(_remote_addr_ipv4.sin_addr), c_addr_str, sizeof(c_addr_str));
+        sprintf(c_port_str, ":%u", (unsigned)ntohs(_remote_addr_ipv4.sin_port));
+        strcat(c_addr_str, c_port_str);
+
+        addr_str = c_addr_str;
+    }
+    else if (_fd_ipv6) {
+        char c_addr_str[INET6_ADDRSTRLEN + 7];
+        char c_port_str[7];
+
+        inet_ntop(AF_INET6, &(_remote_addr_ipv6.sin6_addr), c_addr_str, sizeof(c_addr_str));
+        sprintf(c_port_str, ":%u", (unsigned)ntohs(_remote_addr_ipv6.sin6_port));
+        strcat(c_addr_str, c_port_str);
+
+        addr_str = c_addr_str;
+    }
+    else if (_fd_unix) {
+        addr_str = _remote_addr_unix.sun_path;
+    }
+    else {
+        addr_str.clear();
+    }
+    return;
+}
+
 #endif

@@ -159,9 +159,11 @@ public:
 
     struct Error sleep(double seconds);
     struct Error recv(void *data_out, const size_t len_limit, size_t *len_out = NULL, double timeout_seconds = -1);
+    struct Error send(const void *data, const size_T data_len, size_t *send_len_out, std::string target_address);
+    struct Error reply(const void *data, const size_t data_len, size_t *reply_len_out = NULL);
     // TODO: send()
 
-    void read_client_addr(std::string &addr_str);   // valid in IPv4 or IPv6 type
+    void copy_client_addr(std::string &addr_str);   // valid in IPv4 or IPv6 type
 
 private:
     void _init();
