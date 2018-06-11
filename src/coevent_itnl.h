@@ -10,6 +10,9 @@
 namespace andrewmc {
 namespace libcoevent {
 
+// forever
+#define FOREVER_SECONDS         (3600*24*365*10)
+
 // print()
 #define CFG_PRINT_BUFF_SIZE     (1024)
 ssize_t print(int fd, const char *format, ...);
@@ -39,6 +42,12 @@ BOOL is_coroutine_started(const struct stCoRoutine_t *routine);
 // fd settings
 int set_fd_nonblock(int fd);
 
+// recvfrom()
+ssize_t recv_from(int sockfd, void *buf, size_t len, int flags, struct sockaddr *src_addr, socklen_t *addrlen);
+
+// libevent flag check
+BOOL event_is_timeout(uint32_t libevent_what);
+BOOL event_readable(uint32_t libevent_what);
 
 }   // end of namespace libcoevent
 }   // end of namespace andrewmc

@@ -13,8 +13,6 @@ using namespace andrewmc::libcoevent;
 
 typedef Event _super;
 
-static size_t _default_buffer_size = DEFAULT_BUFFER_SIZE;
-
 // ==========
 // necessary definitions
 #define __CO_EVENT_UDP_DEFINITIONS
@@ -29,8 +27,6 @@ struct _EventArg {
     UDPEvent            *event;
     int                 fd;
     uint32_t            *libevent_what_ptr;
-    uint8_t             *read_buffer;
-    size_t              buffer_size;
 
     struct stCoRoutine_t *coroutine;
     WorkerFunc          worker_func;
@@ -59,7 +55,6 @@ static void *_libco_routine(void *libco_arg)
 
 
 // ==========
-// TODO:
 // libevent style callback, this callback is second part of the coroutine adapter
 #define __CO_EVENT_UDP_CALLBACK
 #ifdef __CO_EVENT_UDP_CALLBACK
@@ -71,7 +66,7 @@ static void _libevent_callback(evutil_socket_t fd, short what, void *libevent_ar
     // switch into the coroutine
     if (arg->libevent_what_ptr) {
         *(arg->libevent_what_ptr) = (uint32_t)what;
-        DEBUG("libevent what: 0x%08x", (unsigned)what);
+        DEBUG("libevent what: 0x%08x - %s%s", (unsigned)what, event_is_timeout(what) ? "timeout " : "", event_readable(what) ? "read" : "");
     }
     co_resume(arg->coroutine);
 
@@ -97,7 +92,7 @@ static void _libevent_callback(evutil_socket_t fd, short what, void *libevent_ar
 #define __INTERNAL_MISC_FUNCTIONS
 #ifdef __INTERNAL_MISC_FUNCTIONS
 
-uint32_t UDPEvent::_pop_libevent_what()
+uint32_t UDPEvent::_libevent_what()
 {
     uint32_t ret = *_libevent_what_storage;
     *_libevent_what_storage = 0;
@@ -105,17 +100,53 @@ uint32_t UDPEvent::_pop_libevent_what()
 }
 
 
-void UDPEvent::set_default_buffer_size(size_t size)
+int UDPEvent::_fd()
 {
-    _default_buffer_size = size;
-    return;
+    if (_fd_ipv4) {
+        return _fd_ipv4;
+    } else if (_fd_ipv6) {
+        return _fd_ipv6;
+    } else if (_fd_unix) {
+        return _fd_unix;
+    } else {
+        ERROR("file descriptor not initialized");
+        _status.set_app_errno(ERR_NOT_INITIALIZED);
+        return -1;
+    }
 }
 
 
-size_t UDPEvent::default_buffer_size()
+struct sockaddr *UDPEvent::_remote_sock_addr()
 {
-    return _default_buffer_size;
+    if (_fd_ipv4) {
+        return (struct sockaddr *)(&_remote_addr_ipv4);
+    } else if (_fd_ipv6) {
+        return (struct sockaddr *)(&_remote_addr_ipv6);
+    } else if (_fd_unix) {
+        return (struct sockaddr *)(&_remote_addr_unix);
+    } else {
+        ERROR("file descriptor not initialized");
+        _status.set_app_errno(ERR_NOT_INITIALIZED);
+        return (struct sockaddr *)(&_remote_addr_unix);
+    }
 }
+
+
+socklen_t *UDPEvent::_remote_sock_addr_len()
+{
+    if (_fd_ipv4) {
+        return &_remote_addr_ipv4_len;
+    } else if (_fd_ipv6) {
+        return &_remote_addr_ipv6_len;
+    } else if (_fd_unix) {
+        return &_remote_addr_unix_len;
+    } else {
+        ERROR("file descriptor not initialized");
+        _status.set_app_errno(ERR_NOT_INITIALIZED);
+        return &_remote_addr_unix_len;
+    }
+}
+
 
 #endif  // end of __INTERNAL_MISC_FUNCTIONS
 
@@ -149,17 +180,6 @@ struct Error UDPEvent::init(Base *base, WorkerFunc func, const struct sockaddr *
     arg->worker_func = func;
     arg->libevent_what_ptr = _libevent_what_storage;
     DEBUG("arg->libevent_what_ptr = %p", arg->libevent_what_ptr);
-
-    // create read buffer
-    arg->read_buffer = (uint8_t *)malloc(_default_buffer_size);
-    if (NULL == arg->read_buffer) {
-        _status.set_sys_errno(errno);
-        _clear();
-        return _status;
-    }
-    else {
-        arg->buffer_size = _default_buffer_size;
-    }
 
     // create arg for libco
     int call_ret = co_create(&(arg->coroutine), NULL, _libco_routine, arg);
@@ -311,6 +331,9 @@ void UDPEvent::_init()
     _identifier = identifier;
 
     _action_mask = _OP_NONE;
+    _remote_addr_ipv4_len = sizeof(_remote_addr_ipv4);
+    _remote_addr_ipv6_len = sizeof(_remote_addr_ipv6);
+    _remote_addr_unix_len = sizeof(_remote_addr_unix);
 
     if (NULL == _libevent_what_storage) {
         _libevent_what_storage = (uint32_t *)malloc(sizeof(*_libevent_what_storage));
@@ -348,13 +371,6 @@ void UDPEvent::_clear()
             DEBUG("remove coroutine");
             co_release(arg->coroutine);
             arg->coroutine = NULL;
-        }
-
-        if (arg->read_buffer) {
-            DEBUG("remove read buffer");
-            delete arg->read_buffer;
-            arg->read_buffer = NULL;
-            arg->buffer_size = 0;
         }
 
         DEBUG("Delete _event_arg");
@@ -482,14 +498,14 @@ struct Error UDPEvent::sleep(double seconds)
         co_yield(arg->coroutine);
 
         // determine libevent event masks
-        uint32_t libevent_what = _pop_libevent_what();
-        if (libevent_what | EV_TIMEOUT)
+        uint32_t libevent_what = _libevent_what();
+        if (event_is_timeout(libevent_what))
         {
             // normally timeout
             _status.clear_err();
             return _status;
         }
-        else if (libevent_what | EV_READ)
+        else if (event_readable(libevent_what))
         {
             // read event occurred
             _status.set_app_errno(ERR_INTERRUPTED_SLEEP);
@@ -502,6 +518,70 @@ struct Error UDPEvent::sleep(double seconds)
             return _status;
         }
     }
+}
+
+
+struct Error UDPEvent::recv(void *data_out, const size_t len_limit, size_t *len_out, double timeout_seconds)
+{
+    ssize_t recv_len = 0;
+    uint32_t libevent_what = 0;
+    struct _EventArg *arg = (struct _EventArg *)_event_arg;
+
+    // param check
+    if (NULL == data_out) {
+        ERROR("no recv data buffer spectied");
+        _status.set_app_errno(ERR_PARA_NULL);
+        return _status;
+    }
+    _status.clear_err();
+
+    // recvfrom()
+    libevent_what = _libevent_what();
+    if (event_readable(libevent_what))
+    {
+        // data readable
+        recv_len = recv_from(_fd(), data_out, len_limit, 0, _remote_sock_addr(), _remote_sock_addr_len());
+        if (recv_len < 0) {
+            _status.set_sys_errno();
+        }
+    }
+    else {
+        // no data avaliable
+        struct timeval timeout = {0, 0};
+        DEBUG("UDP libevent what flag: 0x%04x, now wait", (unsigned)libevent_what);
+        if (timeout_seconds < 0) {
+            timeout.tv_sec = FOREVER_SECONDS;
+        } else {
+            timeout = to_timeval(timeout_seconds);
+        }
+        event_add(_event, &timeout);
+        co_yield(arg->coroutine);
+
+        // check if data read
+        libevent_what = _libevent_what();
+        if (event_readable(libevent_what))
+        {
+            recv_len = recv_from(_fd(), data_out, len_limit, 0, _remote_sock_addr(), _remote_sock_addr_len());
+            if (recv_len < 0) {
+                _status.set_sys_errno();
+            }
+        }
+        else if (event_is_timeout(libevent_what))
+        {
+            recv_len = 0;
+            _status.set_app_errno(ERR_TIMEOUT);
+        }
+        else {
+            ERROR("unrecognized event flag: 0x%04u", libevent_what);
+            _status.set_app_errno(ERR_UNKNOWN);
+        }
+    }
+
+    // write read data len and return
+    if (len_out) {
+        *len_out = (recv_len > 0) ? recv_len : 0;
+    }
+    return _status;
 }
 
 #endif

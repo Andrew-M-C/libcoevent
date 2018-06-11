@@ -27,7 +27,7 @@ static ssize_t _print(const char *format, ...)
     if (pTime)
     {
         memcpy(&currTime, pTime, sizeof(currTime));
-        dateLen = sprintf(buff, "%04d-%02d-%02d,%02d:%02d:%02d.%06ld ", 
+        dateLen = sprintf(buff, "%04d-%02d-%02d, %02d:%02d:%02d.%06ld ", 
                             currTime.tm_year + 1900, currTime.tm_mon + 1, currTime.tm_mday,
                             currTime.tm_hour, currTime.tm_min, currTime.tm_sec, currDayTime.tv_usec);
     }
@@ -51,15 +51,38 @@ static ssize_t _print(const char *format, ...)
 static void _time_routine(evutil_socket_t fd, Event *abs_event, void *arg)
 {
     UDPEvent *event = (UDPEvent *)abs_event;
+    const size_t BUFF_LEN = 2048;
+    struct Error status;
+    size_t read_len = 0;
+    uint8_t data_buff[BUFF_LEN + 1];
+    data_buff[BUFF_LEN] = (uint8_t)0;
+    BOOL should_quit = FALSE;
 
     LOG("Start event, binded at Port %d", event->port());
-    event->sleep(1);
-    LOG("1");
-    event->sleep(0.5);
-    LOG("2");
-    event->sleep(2);
+    LOG("Now sleep(1.5)");
+    event->sleep(1.5);
+    
+    LOG("Now recv");
+    do {
+        should_quit = FALSE;
+        status = event->recv(data_buff, BUFF_LEN, &read_len, 10);
+        if (status.is_timeout()) {
+            LOG("Timeout, wait again");
+        }
+        else if (status.is_error()) {
+            LOG("event error: %s", status.c_err_msg());
+            should_quit = TRUE;
+        }
+        else {
+            data_buff[read_len] = '\0';
+            LOG("Got message, length %u: %s", (unsigned)read_len, (char*)data_buff);
+            if (0 == strcmp((char *)data_buff, "quit")) {
+                should_quit = TRUE;
+            }
+        }
+    } while(FALSE == should_quit);
+    
     LOG("END");
-
     return;
 }
 

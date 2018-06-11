@@ -33,10 +33,6 @@ typedef enum {
 } NetType_t;
 
 
-// default buffer size
-#define DEFAULT_BUFFER_SIZE         (100*1024)     // 100kB for each event
-
-
 // coroutine function
 typedef void (*WorkerFunc)(evutil_socket_t, Event *, void *);
 
@@ -56,14 +52,16 @@ public:
 
     BOOL is_error();
     BOOL is_ok();
+    BOOL is_timeout();
     void set_ssize_t(ssize_t val);
     ssize_t ssize();
     void clear_err();
+    void set_sys_errno();
     void set_sys_errno(int sys_errno);
     void set_app_errno(ErrCode_t lib_errno);
     void set_app_errno(ErrCode_t lib_errno, const char *c_err_msg);
     void set_app_errno(ErrCode_t lib_errno, const std::string &err_msg);
-    const char *get_c_err_msg();
+    const char *c_err_msg();
     uint32_t err_code();
 };
 
@@ -138,6 +136,13 @@ protected:
     uint32_t        _action_mask;
     uint32_t        *_libevent_what_storage;    // ensure that this is assigned in heap instead of stack
 
+    struct sockaddr_in  _remote_addr_ipv4;
+    socklen_t           _remote_addr_ipv4_len;
+    struct sockaddr_in6 _remote_addr_ipv6;
+    socklen_t           _remote_addr_ipv6_len;
+    struct sockaddr_un  _remote_addr_unix;
+    socklen_t           _remote_addr_unix_len;
+
 public:
     UDPEvent();
     ~UDPEvent();
@@ -148,26 +153,24 @@ public:
     struct Error init(Base *base, WorkerFunc func, const char *bind_path, void *user_arg = NULL, BOOL auto_free = TRUE);
     struct Error init(Base *base, WorkerFunc func, std::string &bind_path, void *user_arg = NULL, BOOL auto_free = TRUE);
 
-    static void set_default_buffer_size(size_t size);
-    static size_t default_buffer_size();
-    struct Error set_buffer_size(size_t size);
-    size_t buffer_size();
-
-    void read_client_addr(std::string &addr_str);
-
     NetType_t network_type();
     const char *c_socket_path();    // valid in local type
     int port();                     // valid in IPv4 or IPv6 type
 
     struct Error sleep(double seconds);
-    struct Error recv(void **data_out, size_t *len_out, double timeout_seconds);
-    struct Error send(const void *data, size_t len);
+    struct Error recv(void *data_out, const size_t len_limit, size_t *len_out = NULL, double timeout_seconds = -1);
+    // TODO: send()
+
+    void read_client_addr(std::string &addr_str);   // valid in IPv4 or IPv6 type
 
 private:
     void _init();
     void _clear();
 
-    uint32_t _pop_libevent_what();
+    uint32_t _libevent_what();
+    int _fd();
+    struct sockaddr *_remote_sock_addr();
+    socklen_t *_remote_sock_addr_len();
 };
 
 }   // end of namespace libcoevent

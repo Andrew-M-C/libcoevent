@@ -1,8 +1,10 @@
 
 #include "coevent.h"
 #include "coevent_itnl.h"
+#include "event2/event.h"
 #include <string>
 #include <stdio.h>
+#include <errno.h>
 #include <unistd.h>
 #include <stdlib.h>
 #include <stdarg.h>
@@ -132,6 +134,31 @@ int andrewmc::libcoevent::set_fd_nonblock(int fd)
     {
         return flag;
     }
+}
+
+
+ssize_t andrewmc::libcoevent::recv_from(int sockfd, void *buf, size_t len, int flags, struct sockaddr *src_addr, socklen_t *addrlen)
+{
+    ssize_t ret = recvfrom(sockfd, buf, len, flags, src_addr, addrlen);
+    if (ret < 0) {
+        if (EAGAIN == errno) {
+            DEBUG("EAGAIN");
+            return 0;
+        }
+    }
+    return ret;
+}
+
+
+BOOL andrewmc::libcoevent::event_is_timeout(uint32_t libevent_what)
+{
+    return (libevent_what & EV_TIMEOUT) ? TRUE : FALSE;
+}
+
+
+BOOL andrewmc::libcoevent::event_readable(uint32_t libevent_what)
+{
+    return (libevent_what & EV_READ) ? TRUE : FALSE;
 }
 
 #endif  // end of libcoevent::print

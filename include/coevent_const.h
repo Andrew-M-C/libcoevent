@@ -36,6 +36,9 @@ typedef enum {
     ERR_BIND_PATH_ILLEGAL,
 
     ERR_INTERRUPTED_SLEEP,
+    ERR_TIMEOUT,
+
+    ERR_NOT_INITIALIZED,
 
     ERR_UNKNOWN     // should place at last
 } ErrCode_t;

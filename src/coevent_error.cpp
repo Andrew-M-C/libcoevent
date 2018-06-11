@@ -26,6 +26,9 @@ const char *g_error_msg_list[] = {
     "ilegal bind path",
 
     "sleep action is interrupted",
+    "timeout",
+
+    "object is not initialized",
 
     "unknown error"     // should place at last
 };
@@ -46,6 +49,12 @@ BOOL Error::is_error()
 BOOL Error::is_ok()
 {
     return (0 == _sys_errno);
+}
+
+
+BOOL Error::is_timeout()
+{
+    return (ERR_TIMEOUT == _lib_errno);
 }
 
 
@@ -70,6 +79,16 @@ ssize_t Error::ssize()
 void Error::clear_err()
 {
     set_sys_errno(0);
+    return;
+}
+
+
+void Error::set_sys_errno()
+{
+    _sys_errno = (uint16_t)errno;
+    _lib_errno = 0;
+    _ssize_ret = 0;
+    _err_msg.clear();
     return;
 }
 
@@ -127,7 +146,7 @@ void Error::set_app_errno(ErrCode_t lib_errno)
 }
 
 
-const char *Error::get_c_err_msg()
+const char *Error::c_err_msg()
 {
     if (_sys_errno != 0xFFFF) {
         return strerror((int)_sys_errno);
