@@ -13,6 +13,8 @@ using namespace andrewmc::libcoevent;
 
 typedef Event _super;
 
+static size_t _default_buffer_size = DEFAULT_BUFFER_SIZE;
+
 // ==========
 // necessary definitions
 #define __CO_EVENT_UDP_DEFINITIONS
@@ -27,6 +29,9 @@ struct _EventArg {
     UDPEvent            *event;
     int                 fd;
     uint32_t            *libevent_what_ptr;
+    uint8_t             *read_buffer;
+    size_t              buffer_size;
+
     struct stCoRoutine_t *coroutine;
     WorkerFunc          worker_func;
     void                *user_arg;
@@ -89,8 +94,8 @@ static void _libevent_callback(evutil_socket_t fd, short what, void *libevent_ar
 
 
 // ==========
-#define __INTERNAL_MIST_FUNCTIONS
-#ifdef __INTERNAL_MIST_FUNCTIONS
+#define __INTERNAL_MISC_FUNCTIONS
+#ifdef __INTERNAL_MISC_FUNCTIONS
 
 uint32_t UDPEvent::_pop_libevent_what()
 {
@@ -99,7 +104,20 @@ uint32_t UDPEvent::_pop_libevent_what()
     return ret;
 }
 
-#endif  // end of __INTERNAL_MIST_FUNCTIONS
+
+void UDPEvent::set_default_buffer_size(size_t size)
+{
+    _default_buffer_size = size;
+    return;
+}
+
+
+size_t UDPEvent::default_buffer_size()
+{
+    return _default_buffer_size;
+}
+
+#endif  // end of __INTERNAL_MISC_FUNCTIONS
 
 
 // ==========
@@ -131,6 +149,17 @@ struct Error UDPEvent::init(Base *base, WorkerFunc func, const struct sockaddr *
     arg->worker_func = func;
     arg->libevent_what_ptr = _libevent_what_storage;
     DEBUG("arg->libevent_what_ptr = %p", arg->libevent_what_ptr);
+
+    // create read buffer
+    arg->read_buffer = (uint8_t *)malloc(_default_buffer_size);
+    if (NULL == arg->read_buffer) {
+        _status.set_sys_errno(errno);
+        _clear();
+        return _status;
+    }
+    else {
+        arg->buffer_size = _default_buffer_size;
+    }
 
     // create arg for libco
     int call_ret = co_create(&(arg->coroutine), NULL, _libco_routine, arg);
@@ -225,7 +254,7 @@ struct Error UDPEvent::init(Base *base, WorkerFunc func, NetType_t network_type,
         DEBUG("Init a IPv4 UDP event");
         struct sockaddr_in addr;
         addr.sin_family = AF_INET;
-        addr.sin_port = htons(bind_port);
+        addr.sin_port = htons((unsigned short)bind_port);
         addr.sin_addr.s_addr = htonl(INADDR_ANY);
         return init(base, func, (const struct sockaddr *)(&addr), sizeof(addr), user_arg, auto_free);
     }
@@ -234,7 +263,7 @@ struct Error UDPEvent::init(Base *base, WorkerFunc func, NetType_t network_type,
         DEBUG("Init a IPv6 UDP event");
         struct sockaddr_in6 addr6;
         addr6.sin6_family = AF_INET6;
-        addr6.sin6_port = htons(bind_port);
+        addr6.sin6_port = htons((unsigned short)bind_port);
         addr6.sin6_addr = in6addr_any;
         return init(base, func, (const struct sockaddr *)(&addr6), sizeof(addr6), user_arg, auto_free);
     }
@@ -321,6 +350,13 @@ void UDPEvent::_clear()
             arg->coroutine = NULL;
         }
 
+        if (arg->read_buffer) {
+            DEBUG("remove read buffer");
+            delete arg->read_buffer;
+            arg->read_buffer = NULL;
+            arg->buffer_size = 0;
+        }
+
         DEBUG("Delete _event_arg");
         delete arg;
     }
@@ -395,28 +431,28 @@ const char *UDPEvent::c_socket_path()
 
 int UDPEvent::port()
 {
-    if (_fd_ipv4) {
-        short port = ntohs(_sockaddr_ipv4.sin_port);
+    if (_fd_ipv4)
+    {
+        unsigned short port = ntohs(_sockaddr_ipv4.sin_port);
         if (0 == port) {
             DEBUG("read sock info by getsockname()");
-            struct sockaddr_in addr;
+            struct sockaddr_in addr = {0};
             socklen_t socklen = sizeof(addr);
             getsockname(_fd_ipv4, (struct sockaddr *)(&addr), &socklen);
             port = ntohs(addr.sin_port);
         }
-
         return (int)port;
     }
-    if (_fd_ipv6) {
-        short port = ntohs(_sockaddr_ipv6.sin6_port);
+    if (_fd_ipv6)
+    {
+        unsigned short port = ntohs(_sockaddr_ipv6.sin6_port);
         if (0 == port) {
             DEBUG("read sock info by getsockname()");
-            struct sockaddr_in6 addr;
+            struct sockaddr_in6 addr = {0};
             socklen_t socklen = sizeof(addr);
             getsockname(_fd_ipv6, (struct sockaddr *)(&addr), &socklen);
             port = ntohs(addr.sin6_port);
         }
-
         return (int)port;
     }
     // else

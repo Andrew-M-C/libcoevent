@@ -66,8 +66,11 @@ $(C_OBJS): $(C_OBJS:.o=.c)
 $(ASM_OBJS): $(ASM_OBJS:.o=.S)
 	$(CC) -c $*.S
 
+../../bin/libcoevent.a:
+	make -C ../../
+
 # server
-$(TARGET_BIN): $(C_OBJS) $(CPP_OBJS)
+$(TARGET_BIN): $(C_OBJS) $(CPP_OBJS) ../../bin/libcoevent.a
 	@echo "$(LD) -r -o $@.o *.o"
 	@$(LD) -r -o $@.o $(C_OBJS) $(CPP_OBJS)
 	$(FINAL_CC) $@.o $(STATIC_LIBS) -o $@ $(LDFLAGS)

@@ -8,6 +8,7 @@
 #include <stdarg.h>
 
 using namespace andrewmc::libcoevent;
+#define _UDP_PORT       (2333)
 
 #define LOG(fmt, args...)   _print("SERVER: %s, %d: "fmt, __FILE__, __LINE__, ##args)
 static ssize_t _print(const char *format, ...)
@@ -51,7 +52,7 @@ static void _time_routine(evutil_socket_t fd, Event *abs_event, void *arg)
 {
     UDPEvent *event = (UDPEvent *)abs_event;
 
-    LOG("Start");
+    LOG("Start event, binded at Port %d", event->port());
     event->sleep(1);
     LOG("1");
     event->sleep(0.5);
@@ -75,7 +76,7 @@ int main(int argc, char *argv[])
     UDPEvent *event = new UDPEvent;
     LOG("Hello, libcoevent! Base: %s", base->identifier().c_str());
 
-    event->init(base, _time_routine, NetIPv4);
+    event->init(base, _time_routine, NetIPv4, _UDP_PORT);
     base->run();
 
     LOG("libcoevent base ends");

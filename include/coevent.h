@@ -33,6 +33,10 @@ typedef enum {
 } NetType_t;
 
 
+// default buffer size
+#define DEFAULT_BUFFER_SIZE         (100*1024)     // 100kB for each event
+
+
 // coroutine function
 typedef void (*WorkerFunc)(evutil_socket_t, Event *, void *);
 
@@ -144,11 +148,12 @@ public:
     struct Error init(Base *base, WorkerFunc func, const char *bind_path, void *user_arg = NULL, BOOL auto_free = TRUE);
     struct Error init(Base *base, WorkerFunc func, std::string &bind_path, void *user_arg = NULL, BOOL auto_free = TRUE);
 
-    void set_buffer_size(size_t size);
+    static void set_default_buffer_size(size_t size);
+    static size_t default_buffer_size();
+    struct Error set_buffer_size(size_t size);
     size_t buffer_size();
 
-    const std::string &client_addr();
-    const char *c_client_addr();
+    void read_client_addr(std::string &addr_str);
 
     NetType_t network_type();
     const char *c_socket_path();    // valid in local type
