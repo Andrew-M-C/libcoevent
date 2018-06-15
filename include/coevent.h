@@ -117,6 +117,8 @@ public:
     struct Error init(Base *base, WorkerFunc func, void *user_arg, BOOL auto_free = TRUE);
 
     struct Error sleep(double seconds);     // can ONLY be incoked inside coroutine
+    struct Error sleep(const struct timeval &sleep_time);
+    struct Error sleep_milisecs(unsigned mili_secs);
 private:
     void _init();
     void _clear();
@@ -158,8 +160,13 @@ public:
     int port();                     // valid in IPv4 or IPv6 type
 
     struct Error sleep(double seconds);
-    struct Error recv(void *data_out, const size_t len_limit, size_t *len_out = NULL, double timeout_seconds = -1);
-    struct Error send(const void *data, const size_T data_len, size_t *send_len_out, std::string target_address);
+    struct Error sleep(struct timeval &sleep_time);
+    struct Error sleep_milisecs(unsigned mili_secs);
+
+    struct Error recv(void *data_out, const size_t len_limit, size_t *len_out = NULL, double timeout_seconds = 0);
+    struct Error recv_in_timeval(void *data_out, const size_t len_limit, size_t *len_out, const struct timeval &timeout);
+    struct Error recv_in_mimlisecs(void *data_out, const size_t len_limit, size_t *len_out, unsigned timeout_milisecs);
+    struct Error send(const void *data, const size_t data_len, size_t *send_len_out, std::string target_address);
     struct Error reply(const void *data, const size_t data_len, size_t *reply_len_out = NULL);
     // TODO: send()
 

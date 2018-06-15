@@ -31,6 +31,7 @@ struct timeval to_timeval(double seconds);
 struct timeval to_timeval(float seconds);
 struct timeval to_timeval(int seconds);
 struct timeval to_timeval(long seconds);
+struct timeval to_timeval_from_milisecs(unsigned milisecs);
 
 // to_double()
 double to_double(struct timeval &time);

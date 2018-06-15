@@ -191,6 +191,27 @@ struct Error TimerEvent::init(Base *base, WorkerFunc func, void *user_arg, BOOL 
 }
 
 
+struct Error TimerEvent::sleep(const struct timeval &sleep_time)
+{
+    struct _EventArg *arg = (struct _EventArg *)_event_arg;
+    struct timeval sleep_time_copy;
+    sleep_time_copy.tv_sec = sleep_time.tv_sec;
+    sleep_time_copy.tv_usec = sleep_time.tv_usec;
+
+    evtimer_add(_event, &sleep_time_copy);
+    co_yield(arg->coroutine);
+
+    _status.clear_err();
+    return _status;
+}
+
+
+struct Error TimerEvent::sleep_milisecs(unsigned mili_secs)
+{
+    return sleep(to_timeval_from_milisecs(mili_secs));
+}
+
+
 struct Error TimerEvent::sleep(double seconds)
 {
     if (seconds <= 0) {
@@ -199,13 +220,7 @@ struct Error TimerEvent::sleep(double seconds)
     }
     else {
         struct timeval sleep_time = to_timeval(seconds);
-        struct _EventArg *arg = (struct _EventArg *)_event_arg;
-
-        evtimer_add(_event, &sleep_time);
-        co_yield(arg->coroutine);
-
-        _status.clear_err();
-        return _status;
+        return sleep(sleep_time);
     }
 }
 

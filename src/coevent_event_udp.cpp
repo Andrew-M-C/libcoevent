@@ -484,6 +484,48 @@ int UDPEvent::port()
 #ifdef __PUBLIC_FUNCTIONAL_FUNCTIONS
 
 
+struct Error UDPEvent::sleep(struct timeval &sleep_time)
+{
+    struct _EventArg *arg = (struct _EventArg *)_event_arg;
+
+    _status.clear_err();
+    if ((0 == sleep_time.tv_sec) && (0 == sleep_time.tv_usec)) {
+        return _status;
+    }
+
+    event_add(_event, &sleep_time);
+    co_yield(arg->coroutine);
+
+    // determine libevent event masks
+    uint32_t libevent_what = _libevent_what();
+    if (event_is_timeout(libevent_what))
+    {
+        // normally timeout
+        _status.clear_err();
+        return _status;
+    }
+    else if (event_readable(libevent_what))
+    {
+        // read event occurred
+        _status.set_app_errno(ERR_INTERRUPTED_SLEEP);
+        return _status;
+    }
+    else {
+        // unexpected error
+        ERROR("%s - unexpected libevent masks: 0x%04x", identifier().c_str(), (unsigned)libevent_what);
+        _status.set_app_errno(ERR_UNKNOWN);
+        return _status;
+    }
+}
+
+
+struct Error UDPEvent::sleep_milisecs(unsigned mili_secs)
+{
+    struct timeval timeout = to_timeval_from_milisecs(mili_secs);
+    return sleep(timeout);
+}
+
+
 struct Error UDPEvent::sleep(double seconds)
 {
     if (seconds <= 0) {
@@ -491,37 +533,13 @@ struct Error UDPEvent::sleep(double seconds)
         return _status;
     }
     else {
-        struct timeval sleep_time = to_timeval(seconds);
-        struct _EventArg *arg = (struct _EventArg *)_event_arg;
-
-        event_add(_event, &sleep_time);
-        co_yield(arg->coroutine);
-
-        // determine libevent event masks
-        uint32_t libevent_what = _libevent_what();
-        if (event_is_timeout(libevent_what))
-        {
-            // normally timeout
-            _status.clear_err();
-            return _status;
-        }
-        else if (event_readable(libevent_what))
-        {
-            // read event occurred
-            _status.set_app_errno(ERR_INTERRUPTED_SLEEP);
-            return _status;
-        }
-        else {
-            // unexpected error
-            ERROR("%s - unexpected libevent masks: 0x%04x", identifier().c_str(), (unsigned)libevent_what);
-            _status.set_app_errno(ERR_UNKNOWN);
-            return _status;
-        }
+        struct timeval timeout = to_timeval(seconds);
+        return sleep(timeout);
     }
 }
 
 
-struct Error UDPEvent::recv(void *data_out, const size_t len_limit, size_t *len_out, double timeout_seconds)
+struct Error UDPEvent::recv_in_timeval(void *data_out, const size_t len_limit, size_t *len_out, const struct timeval &timeout)
 {
     ssize_t recv_len = 0;
     uint32_t libevent_what = 0;
@@ -547,14 +565,15 @@ struct Error UDPEvent::recv(void *data_out, const size_t len_limit, size_t *len_
     }
     else {
         // no data avaliable
-        struct timeval timeout = {0, 0};
+        struct timeval timeout_copy;
+        timeout_copy.tv_sec = timeout.tv_sec;
+        timeout_copy.tv_usec = timeout.tv_usec;
+
         DEBUG("UDP libevent what flag: 0x%04x, now wait", (unsigned)libevent_what);
-        if (timeout_seconds < 0) {
-            timeout.tv_sec = FOREVER_SECONDS;
-        } else {
-            timeout = to_timeval(timeout_seconds);
+        if ((0 == timeout_copy.tv_sec) && (0 == timeout_copy.tv_usec)) {
+            timeout_copy.tv_sec = FOREVER_SECONDS;
         }
-        event_add(_event, &timeout);
+        event_add(_event, &timeout_copy);
         co_yield(arg->coroutine);
 
         // check if data read
@@ -582,6 +601,24 @@ struct Error UDPEvent::recv(void *data_out, const size_t len_limit, size_t *len_
         *len_out = (recv_len > 0) ? recv_len : 0;
     }
     return _status;
+}
+
+
+struct Error UDPEvent::recv_in_mimlisecs(void *data_out, const size_t len_limit, size_t *len_out, unsigned mili_secs)
+{
+    struct timeval timeout = to_timeval_from_milisecs(mili_secs);
+    return recv_in_timeval(data_out, len_limit, len_out, timeout);
+}
+
+
+struct Error UDPEvent::recv(void *data_out, const size_t len_limit, size_t *len_out, double timeout_seconds)
+{
+    struct timeval timeout = {0, 0};
+    if (timeout_seconds > 0) {
+        timeout = to_timeval(timeout_seconds);
+    }
+
+    return recv_in_timeval(data_out, len_limit, len_out, timeout);
 }
 
 

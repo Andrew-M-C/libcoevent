@@ -96,6 +96,19 @@ struct timeval andrewmc::libcoevent::to_timeval(long seconds)
 }
 
 
+struct timeval andrewmc::libcoevent::to_timeval_from_milisecs(unsigned milisecs)
+{
+    unsigned secs = milisecs / 1000;
+    milisecs = milisecs - secs * 1000;
+
+    struct timeval sleep_time;
+    sleep_time.tv_sec = secs;
+    sleep_time.tv_usec = milisecs * 1000;
+
+    return sleep_time;
+}
+
+
 double andrewmc::libcoevent::to_double(struct timeval &time)
 {
     double ret;
