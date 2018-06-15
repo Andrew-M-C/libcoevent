@@ -126,7 +126,7 @@ private:
 
 
 // UDP event
-class UDPEvent : public Event {
+class UDPServer : public Event {
 protected:
     void            *_event_arg;
     int             _fd_ipv4;
@@ -146,8 +146,8 @@ protected:
     socklen_t           _remote_addr_unix_len;
 
 public:
-    UDPEvent();
-    ~UDPEvent();
+    UDPServer();
+    ~UDPServer();
 
     struct Error init(Base *base, WorkerFunc func, const struct sockaddr *addr, socklen_t addr_len, void *user_arg = NULL, BOOL auto_free = TRUE);
     struct Error init(Base *base, WorkerFunc func, const struct sockaddr &addr, socklen_t addr_len, void *user_arg = NULL, BOOL auto_free = TRUE);

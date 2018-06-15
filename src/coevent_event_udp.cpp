@@ -24,7 +24,7 @@ typedef Event _super;
 
 
 struct _EventArg {
-    UDPEvent            *event;
+    UDPServer            *event;
     int                 fd;
     uint32_t            *libevent_what_ptr;
 
@@ -73,7 +73,7 @@ static void _libevent_callback(evutil_socket_t fd, short what, void *libevent_ar
     // is coroutine end?
     if (is_coroutine_end(arg->coroutine)) {
         // delete the event if this is under control of the base
-        UDPEvent *event = arg->event;
+        UDPServer *event = arg->event;
         Base  *base  = event->owner();
 
         DEBUG("evudp %s ends", event->identifier().c_str());
@@ -92,7 +92,7 @@ static void _libevent_callback(evutil_socket_t fd, short what, void *libevent_ar
 #define __INTERNAL_MISC_FUNCTIONS
 #ifdef __INTERNAL_MISC_FUNCTIONS
 
-uint32_t UDPEvent::_libevent_what()
+uint32_t UDPServer::_libevent_what()
 {
     uint32_t ret = *_libevent_what_storage;
     *_libevent_what_storage = 0;
@@ -100,7 +100,7 @@ uint32_t UDPEvent::_libevent_what()
 }
 
 
-int UDPEvent::_fd()
+int UDPServer::_fd()
 {
     if (_fd_ipv4) {
         return _fd_ipv4;
@@ -116,7 +116,7 @@ int UDPEvent::_fd()
 }
 
 
-struct sockaddr *UDPEvent::_remote_sock_addr()
+struct sockaddr *UDPServer::_remote_sock_addr()
 {
     if (_fd_ipv4) {
         return (struct sockaddr *)(&_remote_addr_ipv4);
@@ -132,7 +132,7 @@ struct sockaddr *UDPEvent::_remote_sock_addr()
 }
 
 
-socklen_t *UDPEvent::_remote_sock_addr_len()
+socklen_t *UDPServer::_remote_sock_addr_len()
 {
     if (_fd_ipv4) {
         return &_remote_addr_ipv4_len;
@@ -155,7 +155,7 @@ socklen_t *UDPEvent::_remote_sock_addr_len()
 #define __PUBLIC_INIT_AND_CLEAR_FUNCTIONS
 #ifdef __PUBLIC_INIT_AND_CLEAR_FUNCTIONS
 
-struct Error UDPEvent::init(Base *base, WorkerFunc func, const struct sockaddr *addr, socklen_t addr_len, void *user_arg, BOOL auto_free)
+struct Error UDPServer::init(Base *base, WorkerFunc func, const struct sockaddr *addr, socklen_t addr_len, void *user_arg, BOOL auto_free)
 {
     if (!(base && addr)) {
         _status.set_app_errno(ERR_PARA_NULL);
@@ -261,13 +261,13 @@ struct Error UDPEvent::init(Base *base, WorkerFunc func, const struct sockaddr *
 }
 
 
-struct Error UDPEvent::init(Base *base, WorkerFunc func, const struct sockaddr &addr, socklen_t addr_len, void *user_arg, BOOL auto_free)
+struct Error UDPServer::init(Base *base, WorkerFunc func, const struct sockaddr &addr, socklen_t addr_len, void *user_arg, BOOL auto_free)
 {
     return init(base, func, &addr, addr_len, user_arg, auto_free);
 }
 
 
-struct Error UDPEvent::init(Base *base, WorkerFunc func, NetType_t network_type, int bind_port, void *user_arg, BOOL auto_free)
+struct Error UDPServer::init(Base *base, WorkerFunc func, NetType_t network_type, int bind_port, void *user_arg, BOOL auto_free)
 {
     if (NetIPv4 == network_type)
     {
@@ -295,7 +295,7 @@ struct Error UDPEvent::init(Base *base, WorkerFunc func, NetType_t network_type,
 }
 
 
-struct Error UDPEvent::init(Base *base, WorkerFunc func, const char *bind_path, void *user_arg, BOOL auto_free)
+struct Error UDPServer::init(Base *base, WorkerFunc func, const char *bind_path, void *user_arg, BOOL auto_free)
 {
     struct sockaddr_un addr;
     size_t path_len = 0;
@@ -318,13 +318,13 @@ struct Error UDPEvent::init(Base *base, WorkerFunc func, const char *bind_path, 
 }
 
 
-struct Error UDPEvent::init(Base *base, WorkerFunc func, std::string &bind_path, void *user_arg, BOOL auto_free)
+struct Error UDPServer::init(Base *base, WorkerFunc func, std::string &bind_path, void *user_arg, BOOL auto_free)
 {
     return init(base, func, bind_path.c_str(), user_arg, auto_free);
 }
 
 
-void UDPEvent::_init()
+void UDPServer::_init()
 {
     char identifier[64];
     sprintf(identifier, "UDP event %p", this);
@@ -350,7 +350,7 @@ void UDPEvent::_init()
 }
 
 
-void UDPEvent::_clear()
+void UDPServer::_clear()
 {
     if (_event) {
         DEBUG("Delete io event");
@@ -395,14 +395,14 @@ void UDPEvent::_clear()
 }
 
 
-UDPEvent::UDPEvent()
+UDPServer::UDPServer()
 {
     _init();
     return;
 }
 
 
-UDPEvent::~UDPEvent()
+UDPServer::~UDPServer()
 {
     _clear();
 
@@ -421,7 +421,7 @@ UDPEvent::~UDPEvent()
 #define __PUBLIC_MISC_FUNCTIONS
 #ifdef __PUBLIC_MISC_FUNCTIONS
 
-NetType_t UDPEvent::network_type()
+NetType_t UDPServer::network_type()
 {
     if (_fd_ipv4) {
         return NetIPv4;
@@ -435,7 +435,7 @@ NetType_t UDPEvent::network_type()
 }
 
 
-const char *UDPEvent::c_socket_path()
+const char *UDPServer::c_socket_path()
 {
     if (_fd_unix) {
         return _sockaddr_unix.sun_path;
@@ -445,7 +445,7 @@ const char *UDPEvent::c_socket_path()
 }
 
 
-int UDPEvent::port()
+int UDPServer::port()
 {
     if (_fd_ipv4)
     {
@@ -484,7 +484,7 @@ int UDPEvent::port()
 #ifdef __PUBLIC_FUNCTIONAL_FUNCTIONS
 
 
-struct Error UDPEvent::sleep(struct timeval &sleep_time)
+struct Error UDPServer::sleep(struct timeval &sleep_time)
 {
     struct _EventArg *arg = (struct _EventArg *)_event_arg;
 
@@ -519,14 +519,14 @@ struct Error UDPEvent::sleep(struct timeval &sleep_time)
 }
 
 
-struct Error UDPEvent::sleep_milisecs(unsigned mili_secs)
+struct Error UDPServer::sleep_milisecs(unsigned mili_secs)
 {
     struct timeval timeout = to_timeval_from_milisecs(mili_secs);
     return sleep(timeout);
 }
 
 
-struct Error UDPEvent::sleep(double seconds)
+struct Error UDPServer::sleep(double seconds)
 {
     if (seconds <= 0) {
         _status.clear_err();
@@ -539,7 +539,7 @@ struct Error UDPEvent::sleep(double seconds)
 }
 
 
-struct Error UDPEvent::recv_in_timeval(void *data_out, const size_t len_limit, size_t *len_out, const struct timeval &timeout)
+struct Error UDPServer::recv_in_timeval(void *data_out, const size_t len_limit, size_t *len_out, const struct timeval &timeout)
 {
     ssize_t recv_len = 0;
     uint32_t libevent_what = 0;
@@ -604,14 +604,14 @@ struct Error UDPEvent::recv_in_timeval(void *data_out, const size_t len_limit, s
 }
 
 
-struct Error UDPEvent::recv_in_mimlisecs(void *data_out, const size_t len_limit, size_t *len_out, unsigned mili_secs)
+struct Error UDPServer::recv_in_mimlisecs(void *data_out, const size_t len_limit, size_t *len_out, unsigned mili_secs)
 {
     struct timeval timeout = to_timeval_from_milisecs(mili_secs);
     return recv_in_timeval(data_out, len_limit, len_out, timeout);
 }
 
 
-struct Error UDPEvent::recv(void *data_out, const size_t len_limit, size_t *len_out, double timeout_seconds)
+struct Error UDPServer::recv(void *data_out, const size_t len_limit, size_t *len_out, double timeout_seconds)
 {
     struct timeval timeout = {0, 0};
     if (timeout_seconds > 0) {
@@ -622,7 +622,7 @@ struct Error UDPEvent::recv(void *data_out, const size_t len_limit, size_t *len_
 }
 
 
-void UDPEvent::copy_client_addr(std::string &addr_str)
+void UDPServer::copy_client_addr(std::string &addr_str)
 {
     if (_fd_ipv4)
     {

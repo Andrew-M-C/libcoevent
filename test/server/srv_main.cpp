@@ -1,5 +1,5 @@
 
-#include "coevent.h"
+#include "coserver.h"
 #include <stdio.h>
 #include <string>
 
@@ -7,8 +7,9 @@
 #include <stdlib.h>
 #include <stdarg.h>
 
-using namespace andrewmc::libcoevent;
+using namespace andrewmc::libcoserver;
 #define _UDP_PORT       (2333)
+#define _UDP_PORT_2     (6666)
 
 #define LOG(fmt, args...)   _print("SERVER: %s, %d: "fmt, __FILE__, __LINE__, ##args)
 static ssize_t _print(const char *format, ...)
@@ -45,12 +46,12 @@ static ssize_t _print(const char *format, ...)
 
 
 // ==========
-#define __EVENTS
-#ifdef __EVENTS
+#define __serverS
+#ifdef __serverS
 
-static void _time_routine(evutil_socket_t fd, Event *abs_event, void *arg)
+static void _main_server_routine(evutil_socket_t fd, server *abs_server, void *arg)
 {
-    UDPEvent *event = (UDPEvent *)abs_event;
+    UDPServer *server = (UDPServer *)abs_server;
     const size_t BUFF_LEN = 2048;
     struct Error status;
     size_t read_len = 0;
@@ -59,24 +60,24 @@ static void _time_routine(evutil_socket_t fd, Event *abs_event, void *arg)
     BOOL should_quit = FALSE;
     std::string client_addr;
 
-    LOG("Start event, binded at Port %d", event->port());
+    LOG("Start server, binded at Port %d", server->port());
     LOG("Now sleep(1.5)");
-    event->sleep(1.5);
+    server->sleep(1.5);
     
     LOG("Now recv");
     do {
         should_quit = FALSE;
-        status = event->recv(data_buff, BUFF_LEN, &read_len, 10);
+        status = server->recv(data_buff, BUFF_LEN, &read_len, 10);
         if (status.is_timeout()) {
             LOG("Timeout, wait again");
         }
         else if (status.is_error()) {
-            LOG("event error: %s", status.c_err_msg());
+            LOG("server error: %s", status.c_err_msg());
             should_quit = TRUE;
         }
         else {
             data_buff[read_len] = '\0';
-            event->copy_client_addr(client_addr);
+            server->copy_client_addr(client_addr);
             LOG("Got message from '%s', length %u, msg: '%s'", client_addr.c_str(), (unsigned)read_len, (char*)data_buff);
             if (0 == strcmp((char *)data_buff, "quit")) {
                 should_quit = TRUE;
@@ -98,19 +99,19 @@ static void _time_routine(evutil_socket_t fd, Event *abs_event, void *arg)
 int main(int argc, char *argv[])
 {
     Base *base = new Base;
-    UDPEvent *event = new UDPEvent;
-    LOG("Hello, libcoevent! Base: %s", base->identifier().c_str());
+    UDPServer *server = new UDPServer;
+    LOG("Hello, libcoserver! Base: %s", base->identifier().c_str());
 
-    event->init(base, _time_routine, NetIPv4, _UDP_PORT);
+    server->init(base, _main_server_routine, NetIPv4, _UDP_PORT);
     base->run();
 
-    LOG("libcoevent base ends");
+    LOG("libcoserver base ends");
     delete base;
     base = NULL;
-    event = NULL;
+    server = NULL;
 
     return 0;
 }
 
-#endif  // end of libcoevent::Base
+#endif  // end of libcoserver::Base
 
