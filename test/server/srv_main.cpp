@@ -6,6 +6,7 @@
 #include <unistd.h>
 #include <stdlib.h>
 #include <stdarg.h>
+#include <arpa/inet.h>
 
 using namespace andrewmc::libcoevent;
 #define _UDP_PORT       (2333)
@@ -44,6 +45,7 @@ static ssize_t _print(const char *format, ...)
     return (write(1, buff, dateLen + 1));
 }
 
+static void _sub_udp_routine(evutil_socket_t fd, Event *abs_server, void *arg);
 
 // ==========
 #define __SUB_SESSION
@@ -61,6 +63,7 @@ static ssize_t _print(const char *format, ...)
 static void _main_server_routine(evutil_socket_t fd, Event *abs_server, void *arg)
 {
     UDPServer *server = (UDPServer *)abs_server;
+    Base *base = (Base *)arg;
     const size_t BUFF_LEN = 2048;
     struct Error status;
     size_t read_len = 0;
@@ -90,13 +93,47 @@ static void _main_server_routine(evutil_socket_t fd, Event *abs_server, void *ar
                 should_quit = TRUE;
             }
             else {
-                LOG("Send back");
-                server->reply(data_buff, read_len + 1, NULL);
+                struct sockaddr_in *client_addr = NULL;
+                struct Error err;
+                UDPServer *sub_server = new UDPServer;
+
+                err = sub_server->create_custom_storage(sizeof(*client_addr));
+                if (err.is_OK())
+                {
+                    LOG("Ready to send back");
+                    client_addr = (struct sockaddr_in *)sub_server->custom_storage();
+                    server->copy_client_addr((struct sockaddr *)client_addr, sizeof(*client_addr));
+                    sub_server->init(base, _sub_udp_routine, NetIPv4);
+                }
+                else
+                {
+                    delete client_addr;
+                    LOG("Now send back");
+                    server->reply(data_buff, read_len + 1, NULL);
+                }
+
             }
         }
     } while(FALSE == should_quit);
     
     LOG("END");
+    return;
+}
+
+
+static void _sub_udp_routine(evutil_socket_t fd, Event *abs_server, void *arg)
+{
+    UDPServer *server = (UDPServer *)abs_server;
+    void *storage = server->custom_storage();
+    struct sockaddr_in *addr = (struct sockaddr_in *)storage;
+
+    const char data[] = "Thank you for your message!";
+
+    LOG("Handle reply to client with port %u, local port %u", (unsigned)ntohs(addr->sin_port), server->port());
+    server->sleep(1.5);
+    server->send(data, sizeof(data), NULL, (struct sockaddr *)addr);
+
+    LOG("Service ends");
     return;
 }
 
@@ -113,7 +150,7 @@ int main(int argc, char *argv[])
     UDPServer *server = new UDPServer;
     LOG("Hello, libcoevent! Base: %s", base->identifier().c_str());
 
-    server->init(base, _main_server_routine, NetIPv4, _UDP_PORT);
+    server->init(base, _main_server_routine, NetIPv4, _UDP_PORT, base);
     base->run();
 
     LOG("libcoevent base ends");

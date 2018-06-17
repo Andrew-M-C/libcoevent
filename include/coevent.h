@@ -51,6 +51,7 @@ public:
     {}
 
     BOOL is_error();
+    BOOL is_OK();
     BOOL is_ok();
     BOOL is_timeout();
     void set_ssize_t(ssize_t val);
@@ -179,6 +180,7 @@ public:
 
     std::string client_addr();      // valid in IPv4 or IPv6 type
     unsigned client_port();         // valid in IPv4 or IPv6 type
+    void copy_client_addr(struct sockaddr *addr_out, socklen_t addr_len);
 
 private:
     void _init();

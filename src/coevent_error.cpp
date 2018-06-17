@@ -52,6 +52,12 @@ BOOL Error::is_ok()
 }
 
 
+BOOL Error::is_OK()
+{
+    return (0 == _sys_errno);
+}
+
+
 BOOL Error::is_timeout()
 {
     return (ERR_TIMEOUT == _lib_errno);

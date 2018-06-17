@@ -658,6 +658,18 @@ unsigned UDPServer::client_port()
 }
 
 
+void UDPServer::copy_client_addr(struct sockaddr *addr_out, socklen_t addr_len)
+{
+    if (NULL == addr_out) {
+        return;
+    }
+    else {
+        memcpy(addr_out, _remote_sock_addr(), *_remote_sock_addr_len());
+        return;
+    }
+}
+
+
 struct Error UDPServer::send(const void *data, const size_t data_len, size_t *send_len_out, const struct sockaddr *addr)
 {
     _status.clear_err();
