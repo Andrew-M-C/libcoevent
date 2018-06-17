@@ -11,6 +11,7 @@
 #include <time.h>
 #include <sys/time.h>
 #include <fcntl.h>
+#include <arpa/inet.h>
 
 using namespace andrewmc::libcoevent;
 
@@ -173,6 +174,31 @@ BOOL andrewmc::libcoevent::event_readable(uint32_t libevent_what)
 {
     return (libevent_what & EV_READ) ? TRUE : FALSE;
 }
+
+
+void andrewmc::libcoevent::convert_str_to_sockaddr_in(const std::string &str, unsigned port, struct sockaddr_in *addr)
+{
+    if (NULL == addr) {
+        return;
+    }
+    addr->sin_family = AF_INET;
+    addr->sin_port = htons((unsigned short)port);
+    inet_pton(AF_INET, str.c_str(), &(addr->sin_addr));
+    return;
+}
+
+
+void andrewmc::libcoevent::convert_str_to_sockaddr_in6(const std::string &str, unsigned port, struct sockaddr_in6 *addr)
+{
+    if (NULL == addr) {
+        return;
+    }
+    addr->sin6_family = AF_INET6;
+    addr->sin6_port = htons((unsigned short)port);
+    inet_pton(AF_INET6, str.c_str(), &(addr->sin6_addr));
+    return;
+}
+
 
 #endif  // end of libcoevent::print
 

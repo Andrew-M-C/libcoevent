@@ -1,5 +1,5 @@
 
-#include "coserver.h"
+#include "coevent.h"
 #include <stdio.h>
 #include <string>
 
@@ -7,7 +7,7 @@
 #include <stdlib.h>
 #include <stdarg.h>
 
-using namespace andrewmc::libcoserver;
+using namespace andrewmc::libcoevent;
 #define _UDP_PORT       (2333)
 #define _UDP_PORT_2     (6666)
 
@@ -46,10 +46,19 @@ static ssize_t _print(const char *format, ...)
 
 
 // ==========
-#define __serverS
-#ifdef __serverS
+#define __SUB_SESSION
+#ifdef __SUB_SESSION
 
-static void _main_server_routine(evutil_socket_t fd, server *abs_server, void *arg)
+
+
+#endif
+
+
+// ==========
+#define __SERVERS
+#ifdef __SERVERS
+
+static void _main_server_routine(evutil_socket_t fd, Event *abs_server, void *arg)
 {
     UDPServer *server = (UDPServer *)abs_server;
     const size_t BUFF_LEN = 2048;
@@ -58,7 +67,6 @@ static void _main_server_routine(evutil_socket_t fd, server *abs_server, void *a
     uint8_t data_buff[BUFF_LEN + 1];
     data_buff[BUFF_LEN] = (uint8_t)0;
     BOOL should_quit = FALSE;
-    std::string client_addr;
 
     LOG("Start server, binded at Port %d", server->port());
     LOG("Now sleep(1.5)");
@@ -77,10 +85,13 @@ static void _main_server_routine(evutil_socket_t fd, server *abs_server, void *a
         }
         else {
             data_buff[read_len] = '\0';
-            server->copy_client_addr(client_addr);
-            LOG("Got message from '%s', length %u, msg: '%s'", client_addr.c_str(), (unsigned)read_len, (char*)data_buff);
+            LOG("Got message from '%s:%u', length %u, msg: '%s'", server->client_addr().c_str(), server->client_port(), (unsigned)read_len, (char*)data_buff);
             if (0 == strcmp((char *)data_buff, "quit")) {
                 should_quit = TRUE;
+            }
+            else {
+                LOG("Send back");
+                server->reply(data_buff, read_len + 1, NULL);
             }
         }
     } while(FALSE == should_quit);
@@ -100,12 +111,12 @@ int main(int argc, char *argv[])
 {
     Base *base = new Base;
     UDPServer *server = new UDPServer;
-    LOG("Hello, libcoserver! Base: %s", base->identifier().c_str());
+    LOG("Hello, libcoevent! Base: %s", base->identifier().c_str());
 
     server->init(base, _main_server_routine, NetIPv4, _UDP_PORT);
     base->run();
 
-    LOG("libcoserver base ends");
+    LOG("libcoevent base ends");
     delete base;
     base = NULL;
     server = NULL;
@@ -113,5 +124,5 @@ int main(int argc, char *argv[])
     return 0;
 }
 
-#endif  // end of libcoserver::Base
+#endif  // end of libcoevent::Base
 

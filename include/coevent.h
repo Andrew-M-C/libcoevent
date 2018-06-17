@@ -94,12 +94,18 @@ protected:
     Base            *_owner_base;
     struct event    *_event;
     struct Error    _status;
+    void            *_custom_storage;
+    size_t          _custom_storage_size;
 public:
     Event();
     virtual ~Event();
 
     void set_identifier(std::string &identifier);
     const std::string &identifier();
+
+    struct Error create_custom_storage(size_t size);      // allocate customized storage to store user data. This storage will automatically freed when the object is destructed.
+    void *custom_storage();
+    size_t custom_storage_size();
 
     struct Error status();
     Base *owner();
@@ -166,11 +172,13 @@ public:
     struct Error recv(void *data_out, const size_t len_limit, size_t *len_out = NULL, double timeout_seconds = 0);
     struct Error recv_in_timeval(void *data_out, const size_t len_limit, size_t *len_out, const struct timeval &timeout);
     struct Error recv_in_mimlisecs(void *data_out, const size_t len_limit, size_t *len_out, unsigned timeout_milisecs);
-    struct Error send(const void *data, const size_t data_len, size_t *send_len_out, std::string target_address);
+    struct Error send(const void *data, const size_t data_len, size_t *send_len_out_nullable, const struct sockaddr *addr_nullable);
+    struct Error send(const void *data, const size_t data_len, size_t *send_len_out_nullable = NULL, const std::string &target_address = "", unsigned port = 80);
     struct Error reply(const void *data, const size_t data_len, size_t *reply_len_out = NULL);
     // TODO: send()
 
-    void copy_client_addr(std::string &addr_str);   // valid in IPv4 or IPv6 type
+    std::string client_addr();      // valid in IPv4 or IPv6 type
+    unsigned client_port();         // valid in IPv4 or IPv6 type
 
 private:
     void _init();

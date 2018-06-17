@@ -16,6 +16,9 @@ def main():
     # msg = 'quit'
     sock.sendto(msg.encode(), 0, ('127.0.0.1', 2333))
     log.debug('Data sent')
+
+    data, addr = sock.recvfrom(2048, 0)
+    log.debug('Got reply: "%s", server address: %s' % (data.decode(), addr));
     return
 
 

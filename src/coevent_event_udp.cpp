@@ -622,36 +622,121 @@ struct Error UDPServer::recv(void *data_out, const size_t len_limit, size_t *len
 }
 
 
-void UDPServer::copy_client_addr(std::string &addr_str)
+std::string UDPServer::client_addr()
 {
     if (_fd_ipv4)
     {
-        char c_addr_str[INET_ADDRSTRLEN + 7];
-        char c_port_str[7];
-
+        char c_addr_str[INET_ADDRSTRLEN + 1];
+        c_addr_str[INET_ADDRSTRLEN] = '\0';
         inet_ntop(AF_INET, &(_remote_addr_ipv4.sin_addr), c_addr_str, sizeof(c_addr_str));
-        sprintf(c_port_str, ":%u", (unsigned)ntohs(_remote_addr_ipv4.sin_port));
-        strcat(c_addr_str, c_port_str);
-
-        addr_str = c_addr_str;
+        return std::string(c_addr_str);
     }
-    else if (_fd_ipv6) {
-        char c_addr_str[INET6_ADDRSTRLEN + 7];
-        char c_port_str[7];
-
+    else if (_fd_ipv6)
+    {
+        char c_addr_str[INET6_ADDRSTRLEN + 1];
+        c_addr_str[INET6_ADDRSTRLEN] = '\0';
         inet_ntop(AF_INET6, &(_remote_addr_ipv6.sin6_addr), c_addr_str, sizeof(c_addr_str));
-        sprintf(c_port_str, ":%u", (unsigned)ntohs(_remote_addr_ipv6.sin6_port));
-        strcat(c_addr_str, c_port_str);
-
-        addr_str = c_addr_str;
-    }
-    else if (_fd_unix) {
-        addr_str = _remote_addr_unix.sun_path;
+        return std::string(c_addr_str);
     }
     else {
-        addr_str.clear();
+        return "";
     }
-    return;
+}
+
+
+unsigned UDPServer::client_port()
+{
+    if (_fd_ipv4) {
+        return (unsigned)ntohs(_remote_addr_ipv4.sin_port);
+    }
+    else if (_fd_ipv6) {
+        return (unsigned)ntohs(_remote_addr_ipv6.sin6_port);
+    }
+    else {
+        return 0;
+    }
+}
+
+
+struct Error UDPServer::send(const void *data, const size_t data_len, size_t *send_len_out, const struct sockaddr *addr)
+{
+    _status.clear_err();
+    if (NULL == data || 0 == data_len) {
+        ERROR("no data to send");
+        _status.set_app_errno(ERR_PARA_NULL);
+        return _status;
+    }
+
+    // prepare parameters
+    ssize_t send_ret = 0;
+    socklen_t addr_len;
+    int fd = _fd();
+
+    if (NULL == addr) {
+        addr = _remote_sock_addr();
+    }
+
+    if (_fd_ipv4) {
+        addr_len = _remote_addr_ipv4_len;
+    }
+    else if (_fd_ipv6) {
+        addr_len = _remote_addr_ipv6_len;
+    }
+    else if (_fd_unix) {
+        addr_len = _remote_addr_unix_len;
+    }
+
+    // sendto()
+    if (fd > 0) 
+    {
+        send_ret = sendto(fd, data, data_len, 0, addr, addr_len);
+        if (send_ret < 0) {
+            _status.set_sys_errno();
+        }
+    }
+
+    // return
+    if (send_len_out) {
+        if (send_ret > 0) {
+            *send_len_out = send_ret;
+        } else {
+            *send_len_out = 0;
+        }
+    }
+    return _status;
+}
+
+
+struct Error UDPServer::send(const void *data, const size_t data_len, size_t *send_len_out, const std::string &target_address, unsigned port)
+{
+    if (0 == target_address.length()) {
+        return send(data, data_len, send_len_out, NULL);        // reply
+    }
+    else {
+        if (_fd_ipv4) {
+            struct sockaddr_in addr;
+            convert_str_to_sockaddr_in(target_address, port, &addr);
+            return send(data, data_len, send_len_out,(struct sockaddr *)(&addr));
+        }
+        else if (_fd_ipv4) {
+            struct sockaddr_in6 addr;
+            convert_str_to_sockaddr_in6(target_address, port, &addr);
+            return send(data, data_len, send_len_out, (struct sockaddr *)(&addr));
+        }
+        else if (_fd_unix) {
+            return send(data, data_len, send_len_out, NULL);    // reply
+        }
+        else {
+            _status.set_app_errno(ERR_NOT_INITIALIZED);
+            return _status;
+        }
+    }
+}
+
+
+struct Error UDPServer::reply(const void *data, const size_t data_len, size_t *reply_len_out)
+{
+    return send(data, data_len, reply_len_out, NULL);
 }
 
 #endif

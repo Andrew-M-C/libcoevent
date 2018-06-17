@@ -6,6 +6,10 @@
 #include "co_routine_inner.h"
 #include "co_routine.h"
 #include <sys/time.h>
+#include <sys/types.h>
+#include <sys/socket.h>
+#include <netinet/in.h>
+#include <sys/un.h>
 
 namespace andrewmc {
 namespace libcoevent {
@@ -49,6 +53,10 @@ ssize_t recv_from(int sockfd, void *buf, size_t len, int flags, struct sockaddr 
 // libevent flag check
 BOOL event_is_timeout(uint32_t libevent_what);
 BOOL event_readable(uint32_t libevent_what);
+
+// struct sockaddr conversion
+void convert_str_to_sockaddr_in(const std::string &str, unsigned port, struct sockaddr_in *addr_out);
+void convert_str_to_sockaddr_in6(const std::string &str, unsigned port, struct sockaddr_in6 *addr_out);
 
 }   // end of namespace libcoevent
 }   // end of namespace andrewmc
