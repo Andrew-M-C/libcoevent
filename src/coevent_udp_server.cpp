@@ -11,7 +11,7 @@
 
 using namespace andrewmc::libcoevent;
 
-typedef Event _super;
+typedef Server _super;
 
 // ==========
 // necessary definitions

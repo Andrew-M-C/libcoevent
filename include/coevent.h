@@ -22,6 +22,7 @@ namespace libcoevent {
 
 class Base;
 class Event;
+class UDPClient;
 
 
 // network type
@@ -88,7 +89,7 @@ public:
 };
 
 
-// event of libcoevent
+// abstract event of libcoevent
 class Event {
 protected:
     std::string     _identifier;
@@ -113,8 +114,21 @@ public:
 };
 
 
+// abstract event of servers
+class Server : public Event {
+public:
+    virtual UDPClient *create_UDP_client(NetType_t type);
+};
+
+
+// abstract event of clients
+class Client : public Event {
+    // nothing to declare
+};
+
+
 // pure event, no network interfaces supported
-class TimerEvent : public Event {
+class TimerEvent : public Server {
 protected:
     BOOL            _is_initialized;
     void            *_event_arg;
@@ -133,7 +147,7 @@ private:
 
 
 // UDP event
-class UDPServer : public Event {
+class UDPServer : public Server {
 protected:
     void            *_event_arg;
     int             _fd_ipv4;
@@ -170,9 +184,10 @@ public:
     struct Error sleep(struct timeval &sleep_time);
     struct Error sleep_milisecs(unsigned mili_secs);
 
-    struct Error recv(void *data_out, const size_t len_limit, size_t *len_out = NULL, double timeout_seconds = 0);
-    struct Error recv_in_timeval(void *data_out, const size_t len_limit, size_t *len_out, const struct timeval &timeout);
-    struct Error recv_in_mimlisecs(void *data_out, const size_t len_limit, size_t *len_out, unsigned timeout_milisecs);
+    struct Error recv(void *data_out, const size_t len_limit, size_t *len_out_nullable = NULL, double timeout_seconds = 0);
+    struct Error recv_in_timeval(void *data_out, const size_t len_limit, size_t *len_out_nullable, const struct timeval &timeout);
+    struct Error recv_in_mimlisecs(void *data_out, const size_t len_limit, size_t *len_out_nullable, unsigned timeout_milisecs);
+
     struct Error send(const void *data, const size_t data_len, size_t *send_len_out_nullable, const struct sockaddr *addr_nullable);
     struct Error send(const void *data, const size_t data_len, size_t *send_len_out_nullable = NULL, const std::string &target_address = "", unsigned port = 80);
     struct Error reply(const void *data, const size_t data_len, size_t *reply_len_out = NULL);
@@ -191,6 +206,24 @@ private:
     struct sockaddr *_remote_sock_addr();
     socklen_t *_remote_sock_addr_len();
 };
+
+
+// UDP Client
+class UDPClient : public Client {
+public:
+    virtual NetType_t network_type();
+
+    virtual struct Error send(const void *data, const size_t data_len, size_t *send_ken_out_nullable);
+
+    virtual struct Error recv(void *data_out, const size_t len_limie, size_t *len_out_nullable, double timeout_seconds = 0);
+    virtual struct Error recv_in_timeval(void *data_out, const size_t len_limit, size_t *len_out_nullable, const struct timeval &timeout);
+    virtual struct Error recv_in_mimlisecs(void *data_out, const size_t len_limit, size_t *len_out_nullable, unsigned timeout_milisecs);
+
+    virtual std::string remote_addr();    // valid in IPv4 or IPv6 type
+    virtual unsigned remote_port();       // valid in IPv4 or IPv6 type
+    virtual void copy_remote_addr(struct sockaddr *addr_out, socklen_t addr_len);
+};
+
 
 }   // end of namespace libcoevent
 }   // end of namespace andrewmc

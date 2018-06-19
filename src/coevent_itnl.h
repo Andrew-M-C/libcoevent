@@ -5,6 +5,7 @@
 
 #include "co_routine_inner.h"
 #include "co_routine.h"
+#include "coevent.h"
 #include <sys/time.h>
 #include <sys/types.h>
 #include <sys/socket.h>
@@ -57,6 +58,37 @@ BOOL event_readable(uint32_t libevent_what);
 // struct sockaddr conversion
 void convert_str_to_sockaddr_in(const std::string &str, unsigned port, struct sockaddr_in *addr_out);
 void convert_str_to_sockaddr_in6(const std::string &str, unsigned port, struct sockaddr_in6 *addr_out);
+
+// Actual implementation of UDPClient
+class UDPItnlClient : public UDPClient
+{
+private:
+    void            *_event_arg;
+    int             _fd_ipv4;
+    int             _fd_ipv6;
+    int             _fd_unix;
+
+public:
+    UDPItnlClient();
+    ~UDPItnlClient();
+
+    struct Error init(Base *base, struct stCoRoutine_t *coroutine, const struct sockaddr &addr, socklen_t addr_len, void *user_arg = NULL, BOOL auto_free = TRUE);
+    NetType_t network_type();
+
+    struct Error send(const void *data, const size_t data_len, size_t *send_ken_out_nullable);
+
+    struct Error recv(void *data_out, const size_t len_limie, size_t *len_out_nullable, double timeout_seconds = 0);
+    struct Error recv_in_timeval(void *data_out, const size_t len_limit, size_t *len_out_nullable, const struct timeval &timeout);
+    struct Error recv_in_mimlisecs(void *data_out, const size_t len_limit, size_t *len_out_nullable, unsigned timeout_milisecs);
+
+    std::string remote_addr();    // valid in IPv4 or IPv6 type
+    unsigned remote_port();       // valid in IPv4 or IPv6 type
+    void copy_remote_addr(struct sockaddr *addr_out, socklen_t addr_len);
+
+private:
+    void _init();
+    void _clear();
+};
 
 }   // end of namespace libcoevent
 }   // end of namespace andrewmc
