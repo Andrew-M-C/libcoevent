@@ -5,6 +5,7 @@
 
 #include "coevent_const.h"
 #include "event2/event.h"
+#include "co_routine.h"
 
 #include <stdint.h>
 #include <errno.h>
@@ -22,6 +23,7 @@ namespace libcoevent {
 
 class Base;
 class Event;
+class Client;
 class UDPClient;
 
 
@@ -96,8 +98,11 @@ protected:
     Base            *_owner_base;
     struct event    *_event;
     struct Error    _status;
+
+private:
     void            *_custom_storage;
     size_t          _custom_storage_size;
+
 public:
     Event();
     virtual ~Event();
@@ -116,14 +121,25 @@ public:
 
 // abstract event of servers
 class Server : public Event {
+protected:
+    std::set<Client *>  _client_chain;
 public:
-    virtual UDPClient *create_UDP_client(NetType_t type);
+    ~Server();
+    UDPClient *new_UDP_client(NetType_t network_type, void *user_arg = NULL);
+    struct Error delete_client(UDPClient *client);
+protected:
+    virtual struct stCoRoutine_t *_coroutine() = 0;
 };
 
 
 // abstract event of clients
 class Client : public Event {
-    // nothing to declare
+public:
+    Client(){};
+    virtual ~Client(){};
+    virtual std::string remote_addr() = 0;    // valid in IPv4 or IPv6 type
+    virtual unsigned remote_port() = 0;       // valid in IPv4 or IPv6 type
+    virtual void copy_remote_addr(struct sockaddr *addr_out, socklen_t addr_len) = 0;
 };
 
 
@@ -143,6 +159,8 @@ public:
 private:
     void _init();
     void _clear();
+protected:
+    struct stCoRoutine_t *_coroutine();
 };
 
 
@@ -156,7 +174,6 @@ protected:
     struct sockaddr_in  _sockaddr_ipv4;
     struct sockaddr_in6 _sockaddr_ipv6;
     struct sockaddr_un  _sockaddr_unix;
-    uint32_t        _action_mask;
     uint32_t        *_libevent_what_storage;    // ensure that this is assigned in heap instead of stack
 
     struct sockaddr_in  _remote_addr_ipv4;
@@ -191,7 +208,6 @@ public:
     struct Error send(const void *data, const size_t data_len, size_t *send_len_out_nullable, const struct sockaddr *addr_nullable);
     struct Error send(const void *data, const size_t data_len, size_t *send_len_out_nullable = NULL, const std::string &target_address = "", unsigned port = 80);
     struct Error reply(const void *data, const size_t data_len, size_t *reply_len_out = NULL);
-    // TODO: send()
 
     std::string client_addr();      // valid in IPv4 or IPv6 type
     unsigned client_port();         // valid in IPv4 or IPv6 type
@@ -205,23 +221,29 @@ private:
     int _fd();
     struct sockaddr *_remote_sock_addr();
     socklen_t *_remote_sock_addr_len();
+protected:
+    struct stCoRoutine_t *_coroutine();
 };
 
 
 // UDP Client
+// This class should ONLY been instantiated by Server objects 
 class UDPClient : public Client {
 public:
-    virtual NetType_t network_type();
+    UDPClient(){};
+    virtual ~UDPClient(){};
 
-    virtual struct Error send(const void *data, const size_t data_len, size_t *send_ken_out_nullable);
+    virtual NetType_t network_type() = 0;
 
-    virtual struct Error recv(void *data_out, const size_t len_limie, size_t *len_out_nullable, double timeout_seconds = 0);
-    virtual struct Error recv_in_timeval(void *data_out, const size_t len_limit, size_t *len_out_nullable, const struct timeval &timeout);
-    virtual struct Error recv_in_mimlisecs(void *data_out, const size_t len_limit, size_t *len_out_nullable, unsigned timeout_milisecs);
+    virtual struct Error send(const void *data, const size_t data_len, size_t *send_ken_out_nullable) = 0;
 
-    virtual std::string remote_addr();    // valid in IPv4 or IPv6 type
-    virtual unsigned remote_port();       // valid in IPv4 or IPv6 type
-    virtual void copy_remote_addr(struct sockaddr *addr_out, socklen_t addr_len);
+    virtual struct Error recv(void *data_out, const size_t len_limie, size_t *len_out_nullable, double timeout_seconds) = 0;
+    virtual struct Error recv_in_timeval(void *data_out, const size_t len_limit, size_t *len_out_nullable, const struct timeval &timeout) = 0;
+    virtual struct Error recv_in_mimlisecs(void *data_out, const size_t len_limit, size_t *len_out_nullable, unsigned timeout_milisecs) = 0;
+
+    virtual std::string remote_addr() = 0;    // valid in IPv4 or IPv6 type
+    virtual unsigned remote_port() = 0;       // valid in IPv4 or IPv6 type
+    virtual void copy_remote_addr(struct sockaddr *addr_out, socklen_t addr_len) = 0;
 };
 
 

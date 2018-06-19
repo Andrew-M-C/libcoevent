@@ -111,5 +111,9 @@ size_t Event::custom_storage_size()
 }
 
 
-#endif  // end of libcoevent::Event
+#endif
 
+
+// end of libcoevent::Event
+
+// end of file

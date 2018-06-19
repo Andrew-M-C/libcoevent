@@ -62,17 +62,25 @@ void convert_str_to_sockaddr_in6(const std::string &str, unsigned port, struct s
 // Actual implementation of UDPClient
 class UDPItnlClient : public UDPClient
 {
-private:
+protected:
     void            *_event_arg;
     int             _fd_ipv4;
     int             _fd_ipv6;
     int             _fd_unix;
+    uint32_t        *_libevent_what_storage;    // ensure that this is assigned in heap instead of stack
+    struct sockaddr_in  _remote_addr_ipv4;
+    socklen_t           _remote_addr_ipv4_len;
+    struct sockaddr_in6 _remote_addr_ipv6;
+    socklen_t           _remote_addr_ipv6_len;
+    struct sockaddr_un  _remote_addr_unix;
+    socklen_t           _remote_addr_unix_len;
+    Server          *_owner_server;
 
 public:
     UDPItnlClient();
     ~UDPItnlClient();
 
-    struct Error init(Base *base, struct stCoRoutine_t *coroutine, const struct sockaddr &addr, socklen_t addr_len, void *user_arg = NULL, BOOL auto_free = TRUE);
+    struct Error init(Server *server, struct stCoRoutine_t *coroutine, NetType_t network_type, void *user_arg = NULL);
     NetType_t network_type();
 
     struct Error send(const void *data, const size_t data_len, size_t *send_ken_out_nullable);

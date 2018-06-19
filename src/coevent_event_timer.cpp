@@ -121,11 +121,6 @@ void TimerEvent::_clear()
         _event = NULL;
     }
 
-    if (_owner_base) {
-        DEBUG("clear owner base");
-        _owner_base = NULL;
-    }
-
     if (_event_arg) {
         struct _EventArg *arg = (struct _EventArg *)_event_arg;
         _event_arg = NULL;
@@ -141,6 +136,18 @@ void TimerEvent::_clear()
     }
 
     return;
+}
+
+
+struct stCoRoutine_t *TimerEvent::_coroutine()
+{
+    if (_event_arg) {
+        struct _EventArg *arg = (struct _EventArg *)_event_arg;
+        return arg->coroutine;
+    }
+    else {
+        return NULL;
+    }
 }
 
 

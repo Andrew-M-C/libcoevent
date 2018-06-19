@@ -29,6 +29,7 @@ const char *g_error_msg_list[] = {
     "timeout",
 
     "object is not initialized",
+    "object not found",
 
     "unknown error"     // should place at last
 };

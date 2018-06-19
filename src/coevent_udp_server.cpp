@@ -18,11 +18,6 @@ typedef Server _super;
 #define __CO_EVENT_UDP_DEFINITIONS
 #ifdef __CO_EVENT_UDP_DEFINITIONS
 
-#define _OP_NONE    (0)
-#define _OP_SLEEP   (1 << 0)
-#define _OP_RECV    (1 << 1)
-
-
 struct _EventArg {
     UDPServer            *event;
     int                 fd;
@@ -226,7 +221,7 @@ struct Error UDPServer::init(Base *base, WorkerFunc func, const struct sockaddr 
 
     // try binding
     int fd = _fd_ipv4 ? _fd_ipv4 : (_fd_ipv6 ? _fd_ipv4 : _fd_unix);
-    int status = bind(_fd_ipv4, addr, addr_len);
+    int status = bind(fd, addr, addr_len);
     if (status < 0) {
         _clear();
         _status.set_sys_errno(errno);
@@ -327,10 +322,12 @@ struct Error UDPServer::init(Base *base, WorkerFunc func, std::string &bind_path
 void UDPServer::_init()
 {
     char identifier[64];
-    sprintf(identifier, "UDP event %p", this);
+    sprintf(identifier, "UDP server %p", this);
     _identifier = identifier;
 
-    _action_mask = _OP_NONE;
+    _fd_ipv4 = 0;
+    _fd_ipv6 = 0;
+    _fd_unix = 0;
     _remote_addr_ipv4_len = sizeof(_remote_addr_ipv4);
     _remote_addr_ipv6_len = sizeof(_remote_addr_ipv6);
     _remote_addr_unix_len = sizeof(_remote_addr_unix);
@@ -354,13 +351,8 @@ void UDPServer::_clear()
 {
     if (_event) {
         DEBUG("Delete io event");
-        evtimer_del(_event);
+        event_del(_event);
         _event = NULL;
-    }
-
-    if (_owner_base) {
-        DEBUG("clear owner base");
-        _owner_base = NULL;
     }
 
     if (_event_arg) {
@@ -404,6 +396,7 @@ UDPServer::UDPServer()
 
 UDPServer::~UDPServer()
 {
+    DEBUG("Delete UDP server %s", _identifier.c_str());
     _clear();
 
     if (_libevent_what_storage) {
@@ -473,6 +466,18 @@ int UDPServer::port()
     }
     // else
     return -1;
+}
+
+
+struct stCoRoutine_t *UDPServer::_coroutine()
+{
+    if (_event_arg) {
+        struct _EventArg *arg = (struct _EventArg *)_event_arg;
+        return arg->coroutine;
+    }
+    else {
+        return NULL;
+    }
 }
 
 

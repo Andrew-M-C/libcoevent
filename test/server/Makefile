@@ -9,7 +9,7 @@ LD  = ld
 TARGET_BIN = server
 
 # flagsst 
-CFLAGS += -Wall -g -fPIC -lpthread -I../../include -I./
+CFLAGS += -Wall -g -fPIC -lpthread -I../../include -I./ -I../../libco_from_git
 CPPFLAGS += $(CFLAGS)
 LDFLAGS += -Wl,-Bstatic -lcoevent -L../../bin/ -lcolib -L../../libco_from_git/lib -Wl,-Bdynamic -lpthread -lm -lrt -levent -ldl
 

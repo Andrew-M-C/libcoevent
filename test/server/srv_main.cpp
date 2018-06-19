@@ -56,6 +56,52 @@ static void _sub_udp_routine(evutil_socket_t fd, Event *abs_server, void *arg);
 #endif
 
 
+// ========
+#define __TEST
+#ifdef __TEST
+
+class BaseClass {
+public:
+    BaseClass() {
+        LOG("Base");
+    }
+    virtual ~BaseClass() {
+        LOG("~Base");
+    }
+};
+
+
+class ChildClass : public BaseClass {
+public:
+    ChildClass() {
+        LOG("Child");
+    }
+    ~ChildClass() {
+        LOG("~Child");
+    }
+};
+
+
+BaseClass *_create_obj()
+{
+    ChildClass *obj = new ChildClass;
+    return obj;
+}
+
+
+
+static void _test()
+{
+    LOG("Firstly, let's see a inherance in C++")
+    BaseClass *obj = _create_obj();
+    delete obj;
+    return;
+}
+
+
+#endif  // end of __TEST
+
+
 // ==========
 #define __SERVERS
 #ifdef __SERVERS
@@ -146,6 +192,8 @@ static void _sub_udp_routine(evutil_socket_t fd, Event *abs_server, void *arg)
 
 int main(int argc, char *argv[])
 {
+    _test();
+
     Base *base = new Base;
     UDPServer *server = new UDPServer;
     LOG("Hello, libcoevent! Base: %s", base->identifier().c_str());
