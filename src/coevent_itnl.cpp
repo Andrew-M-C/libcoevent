@@ -200,6 +200,17 @@ void andrewmc::libcoevent::convert_str_to_sockaddr_in6(const std::string &str, u
 }
 
 
+void andrewmc::libcoevent::convert_str_to_sockaddr_un(const std::string &str, struct sockaddr_un *addr)
+{
+    if (NULL == addr) {
+        return;
+    }
+    addr->sun_family = AF_UNIX;
+    strncpy(addr->sun_path, str.c_str(), sizeof(addr->sun_path));
+    return;
+}
+
+
 #endif  // end of libcoevent::print
 
 

@@ -416,6 +416,46 @@ struct Error UDPItnlClient::send(const void *data, const size_t data_len, size_t
 }
 
 
+struct Error UDPItnlClient::send(const void *data, const size_t data_len, size_t *send_len_out, const std::string &target_address, unsigned target_port)
+{
+    if (0 == target_address.length()) {
+        _status.set_app_errno(ERR_PARA_NULL);
+        return _status;
+    }
+    else {
+        if (_fd_ipv4) {
+            struct sockaddr_in addr;
+            convert_str_to_sockaddr_in(target_address, target_port, &addr);
+            return send(data, data_len, send_len_out, (struct sockaddr *)(&addr), sizeof(addr));
+        }
+        else if (_fd_ipv4) {
+            struct sockaddr_in6 addr;
+            convert_str_to_sockaddr_in6(target_address, target_port, &addr);
+            return send(data, data_len, send_len_out, (struct sockaddr *)(&addr), sizeof(addr));
+        }
+        else if (_fd_unix) {
+            struct sockaddr_un addr;
+            convert_str_to_sockaddr_un(target_address, &addr);
+            return send(data, data_len, send_len_out, (struct sockaddr *)(&addr), sizeof(addr));
+        }
+        else {
+            _status.set_app_errno(ERR_NOT_INITIALIZED);
+            return _status;
+        }
+    }
+}
+
+
+struct Error UDPItnlClient::send(const void *data, const size_t data_len, size_t *send_len_out, const char *target_address, unsigned target_port)
+{
+    if (NULL == target_address) {
+        target_address = "";
+    }
+    std::string addr_str = target_address;
+    return send(data, data_len, send_len_out, addr_str, target_port);
+}
+
+
 struct Error UDPItnlClient::reply(const void *data, const size_t data_len, size_t *send_len_out)
 {
     struct sockaddr *addr = _remote_addr();

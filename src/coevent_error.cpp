@@ -21,6 +21,7 @@ const char *g_error_msg_list[] = {
 
     "failed to create libco routine",
     "necessary parameter is null",
+    "parameter illegal",
 
     "illegal network interface type",
     "ilegal bind path",

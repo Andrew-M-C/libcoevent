@@ -58,6 +58,7 @@ BOOL event_readable(uint32_t libevent_what);
 // struct sockaddr conversion
 void convert_str_to_sockaddr_in(const std::string &str, unsigned port, struct sockaddr_in *addr_out);
 void convert_str_to_sockaddr_in6(const std::string &str, unsigned port, struct sockaddr_in6 *addr_out);
+void convert_str_to_sockaddr_un(const std::string &str, struct sockaddr_un *addr_out);
 
 // Actual implementation of UDPClient
 class UDPItnlClient : public UDPClient
@@ -83,6 +84,8 @@ public:
     NetType_t network_type();
 
     struct Error send(const void *data, const size_t data_len, size_t *send_len_out_nullable, const struct sockaddr *addr, socklen_t addr_len);
+    struct Error send(const void *data, const size_t data_len, size_t *send_len_out_nullable, const std::string &target_address, unsigned target_port = 80);
+    struct Error send(const void *data, const size_t data_len, size_t *send_len_out_nullable, const char *target_address = "", unsigned target_port = 80);
     struct Error reply(const void *data, const size_t data_len, size_t *send_len_out_nullable = NULL);
 
     struct Error recv(void *data_out, const size_t len_limit, size_t *len_out_nullable, double timeout_seconds = 0);

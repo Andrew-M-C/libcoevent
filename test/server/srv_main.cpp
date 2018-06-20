@@ -161,25 +161,86 @@ static void _main_server_routine(evutil_socket_t fd, Event *abs_server, void *ar
             }
         }
     } while(FALSE == should_quit);
+
+    // tell second server to quit
+    if (0) {
+        const char str[] = "quit";
+        UDPClient *client = server->new_UDP_client(NetIPv4);
+        client->send(str, sizeof(str), NULL, "127.0.0.1", _UDP_PORT_2);
+        server->delete_client(client);
+        client = NULL;
+    }
+    else {
+        const char str[] = "quit";
+        server->send(str, sizeof(str), NULL, "127.0.0.1", _UDP_PORT_2);
+    }
     
     LOG("END");
     return;
 }
 
 
+static void _second_server_routine(evutil_socket_t fd, Event *abs_server, void *arg)
+{
+    UDPServer *server = (UDPServer *)abs_server;
+    const size_t BUFF_LEN = 2048;
+    struct Error status;
+    size_t read_len = 0;
+    BOOL should_quit = FALSE;
+    uint8_t data_buff[BUFF_LEN + 1];
+
+    unsigned count = 0;
+
+    do {
+        should_quit = FALSE;
+        count ++;
+
+        server->recv(data_buff, BUFF_LEN, &read_len);
+        if (read_len > 0) {
+            data_buff[read_len] = '\0';
+            if (0 == strcmp((char *)data_buff, "quit")) {
+                should_quit = TRUE;
+                LOG("Quit second server");
+            }
+            else {
+                LOG("Seconds server got message: '%s'", data_buff);
+                server->sleep(1);
+
+                char data_to_send[BUFF_LEN + 32];
+                sprintf(data_to_send, "%s - %u", (char *)data_buff, count);
+                server->reply(data_to_send, strlen(data_to_send) + 1, NULL);
+            }
+        }
+    } while(FALSE == should_quit);
+
+    return;
+}
+
+
 static void _sub_udp_routine(evutil_socket_t fd, Event *abs_server, void *arg)
 {
+    // TODO:
     UDPServer *server = (UDPServer *)abs_server;
     void *storage = server->custom_storage();
     struct sockaddr_in *addr = (struct sockaddr_in *)storage;
+    struct Error err;
 
-    const char data[] = "Thank you for your message!";
+    char data[1024] = "Thank you for your message!";
+    size_t recv_len = 0;
 
-    LOG("Handle reply to client with port %u, local port %u", (unsigned)ntohs(addr->sin_port), server->port());
-    server->sleep(1.5);
-    server->send(data, sizeof(data), NULL, (struct sockaddr *)addr);
+    UDPClient *client = server->new_UDP_client(NetIPv4);
+    client->send(data, strlen(data) + 1, NULL, "127.0.0.1", _UDP_PORT_2);
 
-    LOG("Service ends");
+    err = client->recv(data, sizeof(data) - 1, &recv_len, 1.5);
+    if (err.is_timeout()) {
+        LOG("recv timeout");
+    }
+    else {
+        data[recv_len] = '\0';
+        server->send(data, strlen(data) + 1, NULL, (struct sockaddr *)addr);
+    }
+
+    LOG("Sub service ends");
     return;
 }
 
@@ -195,16 +256,19 @@ int main(int argc, char *argv[])
     _test();
 
     Base *base = new Base;
-    UDPServer *server = new UDPServer;
+    UDPServer *server_A = new UDPServer;
+    UDPServer *server_B = new UDPServer;
     LOG("Hello, libcoevent! Base: %s", base->identifier().c_str());
 
-    server->init(base, _main_server_routine, NetIPv4, _UDP_PORT, base);
+    server_A->init(base, _main_server_routine, NetIPv4, _UDP_PORT, base);
+    server_B->init(base, _second_server_routine, NetIPv4, _UDP_PORT_2, base);
     base->run();
 
     LOG("libcoevent base ends");
     delete base;
     base = NULL;
-    server = NULL;
+    server_A = NULL;
+    server_B = NULL;
 
     return 0;
 }
