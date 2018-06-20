@@ -31,6 +31,7 @@ typedef enum {
 
     ERR_LIBCO_CREATE,
     ERR_PARA_NULL,
+    ERR_PARA_ILLEGAL,
 
     ERR_NETWORK_TYPE_ILLEGAL,
     ERR_BIND_PATH_ILLEGAL,
@@ -39,6 +40,7 @@ typedef enum {
     ERR_TIMEOUT,
 
     ERR_NOT_INITIALIZED,
+    ERR_OBJ_NOT_FOUND,
 
     ERR_UNKNOWN     // should place at last
 } ErrCode_t;

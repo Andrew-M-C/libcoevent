@@ -21,6 +21,7 @@ const char *g_error_msg_list[] = {
 
     "failed to create libco routine",
     "necessary parameter is null",
+    "parameter illegal",
 
     "illegal network interface type",
     "ilegal bind path",
@@ -29,6 +30,7 @@ const char *g_error_msg_list[] = {
     "timeout",
 
     "object is not initialized",
+    "object not found",
 
     "unknown error"     // should place at last
 };
@@ -47,6 +49,12 @@ BOOL Error::is_error()
 
 
 BOOL Error::is_ok()
+{
+    return (0 == _sys_errno);
+}
+
+
+BOOL Error::is_OK()
 {
     return (0 == _sys_errno);
 }

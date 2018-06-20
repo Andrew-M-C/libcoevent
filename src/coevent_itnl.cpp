@@ -11,6 +11,7 @@
 #include <time.h>
 #include <sys/time.h>
 #include <fcntl.h>
+#include <arpa/inet.h>
 
 using namespace andrewmc::libcoevent;
 
@@ -96,6 +97,19 @@ struct timeval andrewmc::libcoevent::to_timeval(long seconds)
 }
 
 
+struct timeval andrewmc::libcoevent::to_timeval_from_milisecs(unsigned milisecs)
+{
+    unsigned secs = milisecs / 1000;
+    milisecs = milisecs - secs * 1000;
+
+    struct timeval sleep_time;
+    sleep_time.tv_sec = secs;
+    sleep_time.tv_usec = milisecs * 1000;
+
+    return sleep_time;
+}
+
+
 double andrewmc::libcoevent::to_double(struct timeval &time)
 {
     double ret;
@@ -160,6 +174,42 @@ BOOL andrewmc::libcoevent::event_readable(uint32_t libevent_what)
 {
     return (libevent_what & EV_READ) ? TRUE : FALSE;
 }
+
+
+void andrewmc::libcoevent::convert_str_to_sockaddr_in(const std::string &str, unsigned port, struct sockaddr_in *addr)
+{
+    if (NULL == addr) {
+        return;
+    }
+    addr->sin_family = AF_INET;
+    addr->sin_port = htons((unsigned short)port);
+    inet_pton(AF_INET, str.c_str(), &(addr->sin_addr));
+    return;
+}
+
+
+void andrewmc::libcoevent::convert_str_to_sockaddr_in6(const std::string &str, unsigned port, struct sockaddr_in6 *addr)
+{
+    if (NULL == addr) {
+        return;
+    }
+    addr->sin6_family = AF_INET6;
+    addr->sin6_port = htons((unsigned short)port);
+    inet_pton(AF_INET6, str.c_str(), &(addr->sin6_addr));
+    return;
+}
+
+
+void andrewmc::libcoevent::convert_str_to_sockaddr_un(const std::string &str, struct sockaddr_un *addr)
+{
+    if (NULL == addr) {
+        return;
+    }
+    addr->sun_family = AF_UNIX;
+    strncpy(addr->sun_path, str.c_str(), sizeof(addr->sun_path));
+    return;
+}
+
 
 #endif  // end of libcoevent::print
 

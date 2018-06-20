@@ -13,9 +13,15 @@ def main():
     sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
 
     msg = 'Hello, libcoevent from python UDP'
-    # msg = 'quit'
+    if len(sys.argv) > 1:
+        msg = str(sys.argv[1])
+
     sock.sendto(msg.encode(), 0, ('127.0.0.1', 2333))
     log.debug('Data sent')
+
+    if msg != 'quit':
+        data, addr = sock.recvfrom(2048, 0)
+        log.debug('Got reply: "%s", server address: %s' % (data.decode(), addr))
     return
 
 

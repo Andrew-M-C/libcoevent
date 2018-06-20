@@ -6,9 +6,11 @@
 #include <unistd.h>
 #include <stdlib.h>
 #include <stdarg.h>
+#include <arpa/inet.h>
 
 using namespace andrewmc::libcoevent;
 #define _UDP_PORT       (2333)
+#define _UDP_PORT_2     (6666)
 
 #define LOG(fmt, args...)   _print("SERVER: %s, %d: "fmt, __FILE__, __LINE__, ##args)
 static ssize_t _print(const char *format, ...)
@@ -43,48 +45,200 @@ static ssize_t _print(const char *format, ...)
     return (write(1, buff, dateLen + 1));
 }
 
+static void _sub_udp_routine(evutil_socket_t fd, Event *abs_server, void *arg);
 
 // ==========
-#define __EVENTS
-#ifdef __EVENTS
+#define __SUB_SESSION
+#ifdef __SUB_SESSION
 
-static void _time_routine(evutil_socket_t fd, Event *abs_event, void *arg)
+
+
+#endif
+
+
+// ========
+#define __TEST
+#ifdef __TEST
+
+class BaseClass {
+public:
+    BaseClass() {
+        LOG("Base");
+    }
+    virtual ~BaseClass() {
+        LOG("~Base");
+    }
+};
+
+
+class ChildClass : public BaseClass {
+public:
+    ChildClass() {
+        LOG("Child");
+    }
+    ~ChildClass() {
+        LOG("~Child");
+    }
+};
+
+
+BaseClass *_create_obj()
 {
-    UDPEvent *event = (UDPEvent *)abs_event;
+    ChildClass *obj = new ChildClass;
+    return obj;
+}
+
+
+
+static void _test()
+{
+    LOG("Firstly, let's see a inherance in C++");
+    BaseClass *obj = _create_obj();
+    delete obj;
+    return;
+}
+
+
+#endif  // end of __TEST
+
+
+// ==========
+#define __SERVERS
+#ifdef __SERVERS
+
+static void _main_server_routine(evutil_socket_t fd, Event *abs_server, void *arg)
+{
+    UDPServer *server = (UDPServer *)abs_server;
+    Base *base = (Base *)arg;
     const size_t BUFF_LEN = 2048;
     struct Error status;
     size_t read_len = 0;
     uint8_t data_buff[BUFF_LEN + 1];
     data_buff[BUFF_LEN] = (uint8_t)0;
     BOOL should_quit = FALSE;
-    std::string client_addr;
 
-    LOG("Start event, binded at Port %d", event->port());
+    LOG("Start server, binded at Port %d", server->port());
     LOG("Now sleep(1.5)");
-    event->sleep(1.5);
+    server->sleep(1.5);
     
     LOG("Now recv");
     do {
         should_quit = FALSE;
-        status = event->recv(data_buff, BUFF_LEN, &read_len, 10);
+        status = server->recv(data_buff, BUFF_LEN, &read_len, 10);
         if (status.is_timeout()) {
             LOG("Timeout, wait again");
         }
         else if (status.is_error()) {
-            LOG("event error: %s", status.c_err_msg());
+            LOG("server error: %s", status.c_err_msg());
             should_quit = TRUE;
         }
         else {
             data_buff[read_len] = '\0';
-            event->copy_client_addr(client_addr);
-            LOG("Got message from '%s', length %u, msg: '%s'", client_addr.c_str(), (unsigned)read_len, (char*)data_buff);
+            LOG("Got message from '%s:%u', length %u, msg: '%s'", server->client_addr().c_str(), server->client_port(), (unsigned)read_len, (char*)data_buff);
             if (0 == strcmp((char *)data_buff, "quit")) {
                 should_quit = TRUE;
             }
+            else {
+                struct sockaddr_in *client_addr = NULL;
+                struct Error err;
+                NoServer *sub_server = new NoServer;
+
+                err = sub_server->create_custom_storage(sizeof(*client_addr));
+                if (err.is_OK())
+                {
+                    LOG("Ready to send back");
+                    client_addr = (struct sockaddr_in *)sub_server->custom_storage();
+                    server->copy_client_addr((struct sockaddr *)client_addr, sizeof(*client_addr));
+                    sub_server->init(base, _sub_udp_routine, NULL);
+                }
+                else
+                {
+                    LOG("Now send back");
+                    server->reply(data_buff, read_len + 1, NULL);
+                }
+
+            }
         }
     } while(FALSE == should_quit);
+
+    // tell second server to quit
+    if (0) {
+        const char str[] = "quit";
+        UDPClient *client = server->new_UDP_client(NetIPv4);
+        client->send(str, sizeof(str), NULL, "127.0.0.1", _UDP_PORT_2);
+        server->delete_client(client);
+        client = NULL;
+    }
+    else {
+        const char str[] = "quit";
+        server->send(str, sizeof(str), NULL, "127.0.0.1", _UDP_PORT_2);
+    }
     
     LOG("END");
+    return;
+}
+
+
+static void _second_server_routine(evutil_socket_t fd, Event *abs_server, void *arg)
+{
+    UDPServer *server = (UDPServer *)abs_server;
+    const size_t BUFF_LEN = 2048;
+    struct Error status;
+    size_t read_len = 0;
+    BOOL should_quit = FALSE;
+    uint8_t data_buff[BUFF_LEN + 1];
+
+    unsigned count = 0;
+
+    do {
+        should_quit = FALSE;
+        count ++;
+
+        server->recv(data_buff, BUFF_LEN, &read_len);
+        if (read_len > 0) {
+            data_buff[read_len] = '\0';
+            if (0 == strcmp((char *)data_buff, "quit")) {
+                should_quit = TRUE;
+                LOG("Quit second server");
+            }
+            else {
+                LOG("Seconds server got message: '%s'", data_buff);
+                server->sleep(1);
+
+                char data_to_send[BUFF_LEN + 32];
+                sprintf(data_to_send, "%s - %u", (char *)data_buff, count);
+                server->reply(data_to_send, strlen(data_to_send) + 1, NULL);
+            }
+        }
+    } while(FALSE == should_quit);
+
+    return;
+}
+
+
+static void _sub_udp_routine(evutil_socket_t fd, Event *abs_server, void *arg)
+{
+    NoServer *server = (NoServer *)abs_server;
+    void *storage = server->custom_storage();
+    struct sockaddr_in *addr = (struct sockaddr_in *)storage;
+    struct Error err;
+
+    char data[1024] = "Thank you for your message!";
+    size_t recv_len = 0;
+
+    UDPClient *client = server->new_UDP_client(NetIPv4);
+    client->send(data, strlen(data) + 1, NULL, "127.0.0.1", _UDP_PORT_2);
+
+    err = client->recv(data, sizeof(data) - 1, &recv_len, 1.5);
+    if (err.is_timeout()) {
+        LOG("recv timeout");
+    }
+    else {
+        data[recv_len] = '\0';
+        client->send(data, strlen(data) + 1, NULL, (struct sockaddr *)addr, sizeof(*addr));
+    }
+
+    LOG("Sub service ends");
     return;
 }
 
@@ -97,17 +251,22 @@ static void _time_routine(evutil_socket_t fd, Event *abs_event, void *arg)
 
 int main(int argc, char *argv[])
 {
+    _test();
+
     Base *base = new Base;
-    UDPEvent *event = new UDPEvent;
+    UDPServer *server_A = new UDPServer;
+    UDPServer *server_B = new UDPServer;
     LOG("Hello, libcoevent! Base: %s", base->identifier().c_str());
 
-    event->init(base, _time_routine, NetIPv4, _UDP_PORT);
+    server_A->init(base, _main_server_routine, NetIPv4, _UDP_PORT, base);
+    server_B->init(base, _second_server_routine, NetIPv4, _UDP_PORT_2, base);
     base->run();
 
     LOG("libcoevent base ends");
     delete base;
     base = NULL;
-    event = NULL;
+    server_A = NULL;
+    server_B = NULL;
 
     return 0;
 }

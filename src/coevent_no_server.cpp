@@ -5,18 +5,18 @@
 
 using namespace andrewmc::libcoevent;
 
-typedef Event _super;
+typedef Server _super;
 
 // ==========
 // necessary definitions
-#define __CO_EVENT_TIMER_DEFINITIONS
-#ifdef __CO_EVENT_TIMER_DEFINITIONS
+#define __CO_EVENT_NO_SERVER_DEFINITIONS
+#ifdef __CO_EVENT_NO_SERVER_DEFINITIONS
 
 static int _g_libco_arg_counter = 0;    // to detect memory leaks
 
 
 struct _EventArg {
-    TimerEvent          *event;
+    NoServer            *event;
     void                *user_arg;
     WorkerFunc          worker_func;
     struct stCoRoutine_t *coroutine;
@@ -38,8 +38,8 @@ struct _EventArg {
 
 // ==========
 // libco style routine, this routine is first part of the coroutine adapter
-#define __CO_EVENT_TIMER_LIBCO_ROUTINE
-#ifdef __CO_EVENT_TIMER_LIBCO_ROUTINE
+#define __CO_EVENT_NO_SERVER_LIBCO_ROUTINE
+#ifdef __CO_EVENT_NO_SERVER_LIBCO_ROUTINE
 
 static void *_libco_routine(void *libco_arg)
 {
@@ -53,8 +53,8 @@ static void *_libco_routine(void *libco_arg)
 
 // ==========
 // libevent style callback, this callback is second part of the coroutine adapter
-#define __CO_EVENT_TIMER_CALLBACK
-#ifdef __CO_EVENT_TIMER_CALLBACK
+#define __CO_EVENT_NO_SERVER_CALLBACK
+#ifdef __CO_EVENT_NO_SERVER_CALLBACK
 
 static void _libevent_callback(evutil_socket_t fd, short what, void *libevent_arg)
 {
@@ -65,12 +65,12 @@ static void _libevent_callback(evutil_socket_t fd, short what, void *libevent_ar
 
     // is coroutine end?
     if (is_coroutine_end(arg->coroutine)) {
-        // delete the event if this is under control of the base
-        TimerEvent *event = arg->event;
-        Base  *base  = event->owner();
+        // delete the server if this is under control of the base
+        NoServer *server = arg->event;
+        Base *base = server->owner();
 
-        DEBUG("evtimer %s ends", event->identifier().c_str());
-        base->delete_event_under_control(event);
+        DEBUG("evtimer %s ends", server->identifier().c_str());
+        base->delete_event_under_control(server);
     }
 
     // done
@@ -85,45 +85,40 @@ static void _libevent_callback(evutil_socket_t fd, short what, void *libevent_ar
 #define __PUBLIC_FUNCTIONS
 #ifdef __PUBLIC_FUNCTIONS
 
-TimerEvent::TimerEvent()
+NoServer::NoServer()
 {
-    DEBUG("Create timer event");
+    DEBUG("Create 'NO' server");
     this->_init();
     return;
 }
 
 
-TimerEvent::~TimerEvent()
+NoServer::~NoServer()
 {
-    DEBUG("Delete timer event");
+    DEBUG("Delete 'NO' server");
     this->_clear();
     return;
 }
 
 
-void TimerEvent::_init()
+void NoServer::_init()
 {
     _is_initialized = FALSE;
 
     char identifier[64];
-    sprintf(identifier, "timer event %p", this);
+    sprintf(identifier, "NO server %p", this);
     _identifier = identifier;
 
     return;
 }
 
 
-void TimerEvent::_clear()
+void NoServer::_clear()
 {
     if (_event) {
         DEBUG("Delete evtimer");
         evtimer_del(_event);
         _event = NULL;
-    }
-
-    if (_owner_base) {
-        DEBUG("clear owner base");
-        _owner_base = NULL;
     }
 
     if (_event_arg) {
@@ -144,7 +139,19 @@ void TimerEvent::_clear()
 }
 
 
-struct Error TimerEvent::init(Base *base, WorkerFunc func, void *user_arg, BOOL auto_free)
+struct stCoRoutine_t *NoServer::_coroutine()
+{
+    if (_event_arg) {
+        struct _EventArg *arg = (struct _EventArg *)_event_arg;
+        return arg->coroutine;
+    }
+    else {
+        return NULL;
+    }
+}
+
+
+struct Error NoServer::init(Base *base, WorkerFunc func, void *user_arg, BOOL auto_free)
 {
     if (NULL == base) {
         _status.set_app_errno(ERR_PARA_NULL);
@@ -191,7 +198,28 @@ struct Error TimerEvent::init(Base *base, WorkerFunc func, void *user_arg, BOOL 
 }
 
 
-struct Error TimerEvent::sleep(double seconds)
+struct Error NoServer::sleep(const struct timeval &sleep_time)
+{
+    struct _EventArg *arg = (struct _EventArg *)_event_arg;
+    struct timeval sleep_time_copy;
+    sleep_time_copy.tv_sec = sleep_time.tv_sec;
+    sleep_time_copy.tv_usec = sleep_time.tv_usec;
+
+    evtimer_add(_event, &sleep_time_copy);
+    co_yield(arg->coroutine);
+
+    _status.clear_err();
+    return _status;
+}
+
+
+struct Error NoServer::sleep_milisecs(unsigned mili_secs)
+{
+    return sleep(to_timeval_from_milisecs(mili_secs));
+}
+
+
+struct Error NoServer::sleep(double seconds)
 {
     if (seconds <= 0) {
         _status.clear_err();
@@ -199,13 +227,7 @@ struct Error TimerEvent::sleep(double seconds)
     }
     else {
         struct timeval sleep_time = to_timeval(seconds);
-        struct _EventArg *arg = (struct _EventArg *)_event_arg;
-
-        evtimer_add(_event, &sleep_time);
-        co_yield(arg->coroutine);
-
-        _status.clear_err();
-        return _status;
+        return sleep(sleep_time);
     }
 }
 

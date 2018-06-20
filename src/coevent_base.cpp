@@ -32,7 +32,9 @@ Base::~Base()
     }
 
     // free all events under control
-    for (std::set<Event *>::iterator it = _events_under_control.begin(); it != _events_under_control.end(); it ++)
+    for (std::set<Event *>::iterator it = _events_under_control.begin(); 
+        it != _events_under_control.end(); 
+        it ++)
     {
         delete *it;
     }
