@@ -69,7 +69,7 @@ static void _libevent_callback(evutil_socket_t fd, short what, void *libevent_ar
     if (is_coroutine_end(arg->coroutine)) {
         // delete the event if this is under control of the base
         UDPServer *event = arg->event;
-        Base  *base  = event->owner();
+        Base *base  = event->owner();
 
         DEBUG("evudp %s ends", event->identifier().c_str());
         base->delete_event_under_control(event);
@@ -669,7 +669,8 @@ void UDPServer::copy_client_addr(struct sockaddr *addr_out, socklen_t addr_len)
         return;
     }
     else {
-        memcpy(addr_out, _remote_sock_addr(), *_remote_sock_addr_len());
+        socklen_t remote_addr_len = *_remote_sock_addr_len();
+        memcpy(addr_out, _remote_sock_addr(), remote_addr_len <= addr_len ? remote_addr_len : addr_len);
         return;
     }
 }

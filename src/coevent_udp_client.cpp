@@ -50,11 +50,12 @@ static void _libevent_callback(evutil_socket_t fd, short what, void *libevent_ar
     // is coroutine end?
     if (is_coroutine_end(arg->coroutine)) {
         // delete the event if this is under control of the base
-        UDPItnlClient *event = arg->event;
-        Base *base = event->owner();
+        UDPItnlClient *client = arg->event;
+        Server *server = client->owner_server();
+        Base *base = client->owner();
 
-        DEBUG("evudp %s ends", event->identifier().c_str());
-        base->delete_event_under_control(event);
+        DEBUG("Server %s ends", server->identifier().c_str());
+        base->delete_event_under_control(server);
     }
 
     // done
@@ -97,9 +98,7 @@ void UDPItnlClient::_init()
     _fd_ipv4 = 0;
     _fd_ipv6 = 0;
     _fd_unix = 0;
-    _remote_addr_ipv4_len = sizeof(_remote_addr_ipv4);
-    _remote_addr_ipv6_len = sizeof(_remote_addr_ipv6);
-    _remote_addr_unix_len = sizeof(_remote_addr_unix);
+    _remote_addr_len = 0;
 
     if (NULL == _libevent_what_storage) {
         _libevent_what_storage = (uint32_t *)malloc(sizeof(*_libevent_what_storage));
@@ -144,6 +143,7 @@ void UDPItnlClient::_clear()
         close(_fd_unix);
     }
 
+    _fd = 0;
     _event_arg = NULL;
     _fd_ipv4 = 0;
     _fd_ipv6 = 0;
@@ -175,23 +175,91 @@ NetType_t UDPItnlClient::network_type()
 
 std::string UDPItnlClient::remote_addr()
 {
-    // TODO:
-    return "";
+    if (_fd_ipv4)
+    {
+        char c_addr_str[INET_ADDRSTRLEN + 1];
+        c_addr_str[INET_ADDRSTRLEN] = '\0';
+        inet_ntop(AF_INET, &(_remote_addr_ipv4.sin_addr), c_addr_str, sizeof(c_addr_str));
+        return std::string(c_addr_str);
+    }
+    else if (_fd_ipv6)
+    {
+        char c_addr_str[INET6_ADDRSTRLEN + 1];
+        c_addr_str[INET6_ADDRSTRLEN] = '\0';
+        inet_ntop(AF_INET6, &(_remote_addr_ipv6.sin6_addr), c_addr_str, sizeof(c_addr_str));
+        return std::string(c_addr_str);
+    }
+    else if (_fd_unix)
+    {
+        return std::string(_remote_addr_unix.sun_path);
+    }
+    else {
+        return "";
+    }
 }
 
 
 unsigned UDPItnlClient::remote_port()
 {
-    // TODO:
-    return 0;
+    if (_fd_ipv4) {
+        return (unsigned)ntohs(_remote_addr_ipv4.sin_port);
+    } else if (_fd_ipv6) {
+        return (unsigned)ntohs(_remote_addr_ipv6.sin6_port);
+    } else {
+        return 0;
+    }
 }
 
 
 void UDPItnlClient::copy_remote_addr(struct sockaddr *addr_out, socklen_t addr_len)
 {
-    // TODO:
+    struct sockaddr *addr = NULL;
+    socklen_t local_addr_len = 0;
+
+    if (!(addr_out && addr_len)) {
+        return;
+    }
+
+    if (_fd_ipv4) {
+        addr = (struct sockaddr *)&_remote_addr_ipv4;
+        local_addr_len = sizeof(_remote_addr_ipv4);
+    }
+    else if (_fd_ipv6) {
+        addr = (struct sockaddr *)&_remote_addr_ipv6;
+        local_addr_len = sizeof(_remote_addr_ipv6);
+    }
+    else if (_fd_unix) {
+        addr = (struct sockaddr *)&_remote_addr_unix;
+        local_addr_len = sizeof(_remote_addr_unix);
+    }
+    else {
+        return;
+    }
+
+    memcpy(addr_out, addr, local_addr_len <= addr_len ? local_addr_len : addr_len);
     return;
 }
+
+
+Server *UDPItnlClient::owner_server()
+{
+    return _owner_server;
+}
+
+
+struct sockaddr *UDPItnlClient::_remote_addr()
+{
+    if (_fd_ipv4) {
+        return (struct sockaddr *)&_remote_addr_ipv4;
+    } else if (_fd_ipv6) {
+        return (struct sockaddr *)&_remote_addr_ipv6;
+    } else if (_fd_unix) {
+        return (struct sockaddr *)&_remote_addr_unix;
+    } else {
+        return NULL;
+    }
+}
+
 
 #endif  // end of __MISC_FUNCTIONS
 
@@ -278,6 +346,10 @@ struct Error UDPItnlClient::init(Server *server, struct stCoRoutine_t *coroutine
         _status.set_sys_errno(errno);
         return _status;
     }
+    else {
+        _remote_addr_len = addr_len;
+        _fd = fd;
+    }
 
     // try binding
     int status = bind(fd, addr, addr_len);
@@ -305,6 +377,8 @@ struct Error UDPItnlClient::init(Server *server, struct stCoRoutine_t *coroutine
         // base->put_event_under_control(this);
     }
 
+    // This event will not be added to base now. It will be done later in recv operations
+
     // done
     return _status;
 }
@@ -316,10 +390,40 @@ struct Error UDPItnlClient::init(Server *server, struct stCoRoutine_t *coroutine
 #define __SEND_FUNCTION
 #ifdef __SEND_FUNCTION
 
-struct Error UDPItnlClient::send(const void *data, const size_t data_len, size_t *send_ken_out)
+struct Error UDPItnlClient::send(const void *data, const size_t data_len, size_t *send_len_out, const struct sockaddr *addr, socklen_t addr_len)
 {
-    // TODO:
+    _status.clear_err();
+    if (!(data && data_len && addr)) {
+        return _status;
+    }
+
+    if (_fd <= 0) {
+        _status.set_app_errno(ERR_NOT_INITIALIZED);
+        return _status;
+    }
+    
+    ssize_t send_ret = 0;
+
+    send_ret = sendto(_fd, data, data_len, 0, addr, addr_len);
+    if (send_ret < 0) {
+        _status.set_sys_errno();
+    }
+
+    if (send_len_out) {
+        *send_len_out = (send_ret > 0) ? send_ret : 0;
+    }
     return _status;
+}
+
+
+struct Error UDPItnlClient::reply(const void *data, const size_t data_len, size_t *send_len_out)
+{
+    struct sockaddr *addr = _remote_addr();
+    if (NULL == addr) {
+        _status.set_app_errno(ERR_NOT_INITIALIZED);
+        return _status;
+    }
+    return send(data, data_len, send_len_out, addr, _remote_addr_len);
 }
 
 #endif  // end of __SEND_FUNCTION
@@ -329,24 +433,86 @@ struct Error UDPItnlClient::send(const void *data, const size_t data_len, size_t
 #define __RECV_FUNCTION
 #ifdef __RECV_FUNCTION
 
-struct Error UDPItnlClient::recv(void *data_out, const size_t len_limie, size_t *len_out, double timeout_seconds)
+struct Error UDPItnlClient::recv(void *data_out, const size_t len_limit, size_t *len_out, double timeout_seconds)
 {
-    // TODO:
-    return _status;
+    struct timeval timeout;
+
+    if (timeout_seconds <= 0) {
+        timeout.tv_sec = 0;
+        timeout.tv_usec = 0;
+    }
+    else {
+        timeout = to_timeval(timeout_seconds);
+    }
+
+    return recv_in_timeval(data_out, len_limit, len_out, timeout);
 }
 
 
 struct Error UDPItnlClient::recv_in_timeval(void *data_out, const size_t len_limit, size_t *len_out, const struct timeval &timeout)
 {
-    // TODO:
+    ssize_t recv_len = 0;
+    uint32_t libevent_what = *_libevent_what_storage;
+    struct _EventArg *arg = (struct _EventArg *)_event_arg;
+
+    if (!(data_out && len_limit)) {
+        _status.set_app_errno(ERR_PARA_NULL);
+        return _status;
+    }
+    _status.clear_err();
+
+    if (event_readable(libevent_what))
+    {
+        recv_len = recv_from(_fd, data_out, len_limit, 0, _remote_addr(), &_remote_addr_len);
+        if (recv_len < 0) {
+            _status.set_sys_errno();
+        }
+    }
+    else {
+        // no data readable
+        struct timeval timeout_copy;
+        timeout_copy.tv_sec = timeout.tv_sec;
+        timeout_copy.tv_usec = timeout.tv_usec;
+
+        DEBUG("UDP libevent what flag: 0x%04x, now wait", (unsigned)libevent_what);
+        if ((0 == timeout_copy.tv_sec) && (0 == timeout_copy.tv_usec)) {
+            timeout_copy.tv_sec = FOREVER_SECONDS;
+        }
+        event_add(_event, &timeout_copy);
+        co_yield(arg->coroutine);
+
+        // check if data readable
+        libevent_what = *_libevent_what_storage;
+        if (event_readable(libevent_what))
+        {
+            recv_len = recv_from(_fd, data_out, len_limit, 0, _remote_addr(), &_remote_addr_len);
+            if (recv_len < 0) {
+                _status.set_sys_errno();
+            }
+        }
+        else if (event_is_timeout(libevent_what))
+        {
+            recv_len = 0;
+            _status.set_app_errno(ERR_TIMEOUT);
+        }
+        else {
+            ERROR("unrecognized event flag: 0x%04u", libevent_what);
+            _status.set_app_errno(ERR_UNKNOWN);
+        }
+    }
+
+    // write read data len and return
+    if (len_out) {
+        *len_out = (recv_len > 0) ? recv_len : 0;
+    }
     return _status;
 }
 
 
 struct Error UDPItnlClient::recv_in_mimlisecs(void *data_out, const size_t len_limit, size_t *len_out, unsigned timeout_milisecs)
 {
-    // TODO:
-    return _status;
+    struct timeval timeout = to_timeval_from_milisecs(timeout_milisecs);
+    return recv_in_timeval(data_out, len_limit, len_out, timeout);
 }
 
 #endif

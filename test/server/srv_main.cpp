@@ -92,7 +92,7 @@ BaseClass *_create_obj()
 
 static void _test()
 {
-    LOG("Firstly, let's see a inherance in C++")
+    LOG("Firstly, let's see a inherance in C++");
     BaseClass *obj = _create_obj();
     delete obj;
     return;

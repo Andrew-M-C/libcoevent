@@ -76,12 +76,12 @@ class Base {
 private:
     struct event_base   *_event_base;
     std::string         _identifier;
-    std::set<Event *>   _events_under_control;  // User may put an event into a base, it will be deallocated automatically when this is not needed anymore.
+    std::set<Event *>   _events_under_control;  // User may put server event into a base, it will be deallocated automatically when this is not needed anymore.
 
     // constructor and destructors
 public:
     Base();
-    ~Base();
+    virtual ~Base();
     struct event_base *event_base();
     struct Error run();
     void set_identifier(std::string &identifier);
@@ -124,7 +124,7 @@ class Server : public Event {
 protected:
     std::set<Client *>  _client_chain;
 public:
-    ~Server();
+    virtual ~Server();
     UDPClient *new_UDP_client(NetType_t network_type, void *user_arg = NULL);
     struct Error delete_client(UDPClient *client);
 protected:
@@ -150,7 +150,7 @@ protected:
     void            *_event_arg;
 public:
     TimerEvent();
-    ~TimerEvent();
+    virtual ~TimerEvent();
     struct Error init(Base *base, WorkerFunc func, void *user_arg, BOOL auto_free = TRUE);
 
     struct Error sleep(double seconds);     // can ONLY be incoked inside coroutine
@@ -235,15 +235,18 @@ public:
 
     virtual NetType_t network_type() = 0;
 
-    virtual struct Error send(const void *data, const size_t data_len, size_t *send_ken_out_nullable) = 0;
+    virtual struct Error send(const void *data, const size_t data_len, size_t *send_len_out_nullable, const struct sockaddr *addr, socklen_t addr_len) = 0;
+    virtual struct Error reply(const void *data, const size_t data_len, size_t *send_len_out_nullable = NULL) = 0;
 
-    virtual struct Error recv(void *data_out, const size_t len_limie, size_t *len_out_nullable, double timeout_seconds) = 0;
+    virtual struct Error recv(void *data_out, const size_t len_limit, size_t *len_out_nullable, double timeout_seconds) = 0;
     virtual struct Error recv_in_timeval(void *data_out, const size_t len_limit, size_t *len_out_nullable, const struct timeval &timeout) = 0;
     virtual struct Error recv_in_mimlisecs(void *data_out, const size_t len_limit, size_t *len_out_nullable, unsigned timeout_milisecs) = 0;
 
     virtual std::string remote_addr() = 0;    // valid in IPv4 or IPv6 type
     virtual unsigned remote_port() = 0;       // valid in IPv4 or IPv6 type
     virtual void copy_remote_addr(struct sockaddr *addr_out, socklen_t addr_len) = 0;
+
+    virtual Server *owner_server() = 0;
 };
 
 

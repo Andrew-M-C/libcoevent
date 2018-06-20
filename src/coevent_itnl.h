@@ -67,25 +67,25 @@ protected:
     int             _fd_ipv4;
     int             _fd_ipv6;
     int             _fd_unix;
+    int             _fd;
     uint32_t        *_libevent_what_storage;    // ensure that this is assigned in heap instead of stack
     struct sockaddr_in  _remote_addr_ipv4;
-    socklen_t           _remote_addr_ipv4_len;
     struct sockaddr_in6 _remote_addr_ipv6;
-    socklen_t           _remote_addr_ipv6_len;
     struct sockaddr_un  _remote_addr_unix;
-    socklen_t           _remote_addr_unix_len;
+    socklen_t       _remote_addr_len;
     Server          *_owner_server;
 
 public:
     UDPItnlClient();
-    ~UDPItnlClient();
+    virtual ~UDPItnlClient();
 
     struct Error init(Server *server, struct stCoRoutine_t *coroutine, NetType_t network_type, void *user_arg = NULL);
     NetType_t network_type();
 
-    struct Error send(const void *data, const size_t data_len, size_t *send_ken_out_nullable);
+    struct Error send(const void *data, const size_t data_len, size_t *send_len_out_nullable, const struct sockaddr *addr, socklen_t addr_len);
+    struct Error reply(const void *data, const size_t data_len, size_t *send_len_out_nullable = NULL);
 
-    struct Error recv(void *data_out, const size_t len_limie, size_t *len_out_nullable, double timeout_seconds = 0);
+    struct Error recv(void *data_out, const size_t len_limit, size_t *len_out_nullable, double timeout_seconds = 0);
     struct Error recv_in_timeval(void *data_out, const size_t len_limit, size_t *len_out_nullable, const struct timeval &timeout);
     struct Error recv_in_mimlisecs(void *data_out, const size_t len_limit, size_t *len_out_nullable, unsigned timeout_milisecs);
 
@@ -93,9 +93,13 @@ public:
     unsigned remote_port();       // valid in IPv4 or IPv6 type
     void copy_remote_addr(struct sockaddr *addr_out, socklen_t addr_len);
 
+    Server *owner_server();
+
 private:
     void _init();
     void _clear();
+
+    struct sockaddr *_remote_addr();
 };
 
 }   // end of namespace libcoevent
