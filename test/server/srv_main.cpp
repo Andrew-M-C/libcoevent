@@ -141,7 +141,7 @@ static void _main_server_routine(evutil_socket_t fd, Event *abs_server, void *ar
             else {
                 struct sockaddr_in *client_addr = NULL;
                 struct Error err;
-                UDPServer *sub_server = new UDPServer;
+                NoServer *sub_server = new NoServer;
 
                 err = sub_server->create_custom_storage(sizeof(*client_addr));
                 if (err.is_OK())
@@ -149,11 +149,10 @@ static void _main_server_routine(evutil_socket_t fd, Event *abs_server, void *ar
                     LOG("Ready to send back");
                     client_addr = (struct sockaddr_in *)sub_server->custom_storage();
                     server->copy_client_addr((struct sockaddr *)client_addr, sizeof(*client_addr));
-                    sub_server->init(base, _sub_udp_routine, NetIPv4);
+                    sub_server->init(base, _sub_udp_routine, NULL);
                 }
                 else
                 {
-                    delete client_addr;
                     LOG("Now send back");
                     server->reply(data_buff, read_len + 1, NULL);
                 }
@@ -219,8 +218,7 @@ static void _second_server_routine(evutil_socket_t fd, Event *abs_server, void *
 
 static void _sub_udp_routine(evutil_socket_t fd, Event *abs_server, void *arg)
 {
-    // TODO:
-    UDPServer *server = (UDPServer *)abs_server;
+    NoServer *server = (NoServer *)abs_server;
     void *storage = server->custom_storage();
     struct sockaddr_in *addr = (struct sockaddr_in *)storage;
     struct Error err;
@@ -237,7 +235,7 @@ static void _sub_udp_routine(evutil_socket_t fd, Event *abs_server, void *arg)
     }
     else {
         data[recv_len] = '\0';
-        server->send(data, strlen(data) + 1, NULL, (struct sockaddr *)addr);
+        client->send(data, strlen(data) + 1, NULL, (struct sockaddr *)addr, sizeof(*addr));
     }
 
     LOG("Sub service ends");

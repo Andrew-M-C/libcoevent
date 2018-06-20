@@ -144,13 +144,13 @@ public:
 
 
 // pure event, no network interfaces supported
-class TimerEvent : public Server {
+class NoServer : public Server {
 protected:
     BOOL            _is_initialized;
     void            *_event_arg;
 public:
-    TimerEvent();
-    virtual ~TimerEvent();
+    NoServer();
+    virtual ~NoServer();
     struct Error init(Base *base, WorkerFunc func, void *user_arg, BOOL auto_free = TRUE);
 
     struct Error sleep(double seconds);     // can ONLY be incoked inside coroutine
