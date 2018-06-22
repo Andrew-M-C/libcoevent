@@ -12,6 +12,8 @@
 #include <string.h>
 #include <string>
 #include <set>
+#include <map>
+#include <vector>
 
 #include <sys/types.h>
 #include <sys/socket.h>
@@ -133,6 +135,7 @@ protected:
 
 
 // abstract event of clients
+// Client classes should ONLY been instantiated by Server objects 
 class Client : public Event {
 public:
     Client(){};
@@ -146,7 +149,6 @@ public:
 // pure event, no network interfaces supported
 class NoServer : public Server {
 protected:
-    BOOL            _is_initialized;
     void            *_event_arg;
 public:
     NoServer();
@@ -227,7 +229,6 @@ protected:
 
 
 // UDP Client
-// This class should ONLY been instantiated by Server objects 
 class UDPClient : public Client {
 public:
     UDPClient(){};
@@ -250,6 +251,86 @@ public:
 
     virtual Server *owner_server() = 0;
 };
+
+
+// DNSClient
+class DNSResult;
+class DNSResourceRecord;
+class DNSClient : public Client {
+public:
+    DNSClient(){};
+    virtual ~DNSClient(){};
+
+    virtual NetType_t network_type() = 0;
+    virtual struct Error resolve(const std::string domain_name, double timeout_seconds = 0, const std::string &dns_server_ip = "") = 0;
+    virtual struct Error resolve_in_timeval(const std::string domain_name, const struct timeval &timeout, const std::string &dns_server_ip = "") = 0;
+    virtual struct Error resolve_in_milisecs(const std::string domain_name, unsigned timeout_milisecs, const std::string &dns_server_ip = "") = 0;
+
+    virtual std::string default_dns_server(size_t index = 0) = 0;
+
+    virtual const std::map<std::string, DNSClient *> &result() = 0;
+};
+
+
+// DNSResult for DNSClient
+typedef enum {
+    DnsRRType_Unknown = 0,
+    DnsRRType_IPv4Addr,
+    DnsRRType_IPv6Addr,
+    DnsRRType_ServerName,
+    DnsRRType_CName,
+} DNSRRType_t;
+
+typedef enum {
+    DnsRRClass_Unknown = 0,
+    DnsRRClass_Internet,
+} DNSRRClass_t;
+
+
+class DNSResult {
+protected:
+    time_t      _update_time;   // saved as sysup time
+    time_t      _update_ttl;
+    NetType_t   _network_type;
+    std::string _domain_name;
+public:
+    const std::string &domain_name();
+    const std::vector<DNSResourceRecord *> &resource_record_list();
+    std::vector<std::string> IP_addresses();
+    time_t time_to_live();
+};
+
+
+class DNSResourceRecord {
+public:
+    std::string     rr_name;
+    DNSRRType_t     rr_type;
+    DNSRRClass_t    rr_class;
+    uint32_t        rr_ttl;
+    std::string     rr_address;
+public:
+    DNSResourceRecord():
+        rr_type(DnsRRType_Unknown), rr_class(DnsRRClass_Unknown), rr_ttl(0)
+    {}
+
+    const std::string &name() {
+        return rr_name;
+    }
+    DNSRRType_t type() {
+        return rr_type;
+    }
+    DNSRRClass_t record_class() {
+        return rr_class;
+    }
+    uint32_t ttl() {
+        return rr_ttl;
+    }
+    const std::string &address() {
+        return rr_address;
+    }
+};
+
+
 
 
 }   // end of namespace libcoevent

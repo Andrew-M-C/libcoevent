@@ -103,12 +103,11 @@ NoServer::~NoServer()
 
 void NoServer::_init()
 {
-    _is_initialized = FALSE;
-
     char identifier[64];
     sprintf(identifier, "NO server %p", this);
     _identifier = identifier;
 
+    _event_arg = NULL;
     return;
 }
 

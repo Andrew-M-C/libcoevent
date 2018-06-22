@@ -1,5 +1,6 @@
 
 #include "coevent.h"
+#include "coevent_tools.h"
 #include <stdio.h>
 #include <string>
 
@@ -95,6 +96,10 @@ static void _test()
     LOG("Firstly, let's see a inherance in C++");
     BaseClass *obj = _create_obj();
     delete obj;
+
+    LOG("Now test size: sockaddr(%d), sockaddr_in(%d), sockaddr_in6(%d), sockaddr_un(%d)",
+        sizeof(struct sockaddr), sizeof(struct sockaddr_in), sizeof(struct sockaddr_in6), sizeof(struct sockaddr_un));
+    LOG("INET_ADDRSTRLEN = %u, INET6_ADDRSTRLEN = %u", INET_ADDRSTRLEN, INET6_ADDRSTRLEN);
     return;
 }
 
@@ -117,14 +122,14 @@ static void _main_server_routine(evutil_socket_t fd, Event *abs_server, void *ar
     data_buff[BUFF_LEN] = (uint8_t)0;
     BOOL should_quit = FALSE;
 
-    LOG("Start server, binded at Port %d", server->port());
-    LOG("Now sleep(1.5)");
-    server->sleep(1.5);
+    //LOG("Start server, binded at Port %d", server->port());
+    //LOG("Now sleep(1.5)");
+    //server->sleep(1.5);
     
     LOG("Now recv");
     do {
         should_quit = FALSE;
-        status = server->recv(data_buff, BUFF_LEN, &read_len, 10);
+        status = server->recv(data_buff, BUFF_LEN, &read_len, 0);
         if (status.is_timeout()) {
             LOG("Timeout, wait again");
         }
@@ -135,6 +140,10 @@ static void _main_server_routine(evutil_socket_t fd, Event *abs_server, void *ar
         else {
             data_buff[read_len] = '\0';
             LOG("Got message from '%s:%u', length %u, msg: '%s'", server->client_addr().c_str(), server->client_port(), (unsigned)read_len, (char*)data_buff);
+
+            std::string msg_str = dump_data_to_string(data_buff, read_len);
+            LOG("Data detail:\n%s", msg_str.c_str());
+
             if (0 == strcmp((char *)data_buff, "quit")) {
                 should_quit = TRUE;
             }

@@ -94,11 +94,13 @@ void UDPItnlClient::_init()
     sprintf(identifier, "UDP client %p", this);
     _identifier = identifier;
 
+    _event_arg = NULL;
     _owner_server = NULL;
     _fd_ipv4 = 0;
     _fd_ipv6 = 0;
     _fd_unix = 0;
     _remote_addr_len = 0;
+    _libevent_what_storage = NULL;
 
     if (NULL == _libevent_what_storage) {
         _libevent_what_storage = (uint32_t *)malloc(sizeof(*_libevent_what_storage));
@@ -130,7 +132,7 @@ void UDPItnlClient::_clear()
         // do not remove coroutine because client does not own it
 
         DEBUG("Delete _event_arg");
-        delete arg;
+        free(arg);
     }
 
     if (_fd_ipv4) {
@@ -302,7 +304,13 @@ struct Error UDPItnlClient::init(Server *server, struct stCoRoutine_t *coroutine
     struct sockaddr *addr = NULL;
     socklen_t addr_len = 0;
 
-    struct _EventArg *arg = new _EventArg;
+    struct _EventArg *arg = (struct _EventArg *)malloc(sizeof(*arg));
+    if (NULL == arg) {
+        _clear();
+        _status.set_sys_errno();
+        return _status;
+    }
+
     _event_arg = arg;
     arg->event = this;
     arg->user_arg = user_arg;

@@ -331,6 +331,8 @@ void UDPServer::_init()
     _remote_addr_ipv4_len = sizeof(_remote_addr_ipv4);
     _remote_addr_ipv6_len = sizeof(_remote_addr_ipv6);
     _remote_addr_unix_len = sizeof(_remote_addr_unix);
+    _libevent_what_storage = NULL;
+    _event_arg = NULL;
 
     if (NULL == _libevent_what_storage) {
         _libevent_what_storage = (uint32_t *)malloc(sizeof(*_libevent_what_storage));
