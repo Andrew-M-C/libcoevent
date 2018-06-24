@@ -1,6 +1,6 @@
 
 #include "coevent.h"
-#include "coevent_tools.h"
+#include "cpp_tools.h"
 #include <stdio.h>
 #include <string>
 
@@ -10,6 +10,8 @@
 #include <arpa/inet.h>
 
 using namespace andrewmc::libcoevent;
+using namespace andrewmc::cpptools;
+
 #define _UDP_PORT       (2333)
 #define _UDP_PORT_2     (6666)
 

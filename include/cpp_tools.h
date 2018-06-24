@@ -1,6 +1,5 @@
 // file encoding: UTF-8
 
-#include "coevent.h"
 #include <string>
 #include <stddef.h>
 
@@ -8,7 +7,7 @@
 #define __CO_EVENT_TOOLS_H__
 
 namespace andrewmc {
-namespace libcoevent {
+namespace cpptools {
 
 std::string dump_data_to_string(const void *data, size_t size);
 

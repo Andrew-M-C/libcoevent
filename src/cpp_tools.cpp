@@ -1,11 +1,11 @@
 
 #include "coevent.h"
-#include "coevent_tools.h"
+#include "cpp_tools.h"
 
 #include <stdint.h>
 #include <stdio.h>
 
-using namespace andrewmc::libcoevent;
+using namespace andrewmc::cpptools;
 
 // ==========
 #define __PUBLIC_FUNCTIONS
@@ -61,7 +61,7 @@ static inline void _byte_to_str_without_end(char *dst, uint8_t byte)
 }
 
 
-std::string andrewmc::libcoevent::dump_data_to_string(const void *data, size_t size)
+std::string andrewmc::cpptools::dump_data_to_string(const void *data, size_t size)
 {
     const uint8_t *bytes = (const uint8_t *)data;
     std::string ret;
