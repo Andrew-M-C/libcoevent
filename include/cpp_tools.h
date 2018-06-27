@@ -3,6 +3,8 @@
 #include <string>
 #include <stddef.h>
 #include <stdexcept>
+#include <sys/time.h>
+#include <vector>
 
 #ifndef __CPP_TOOLS_H__
 #define __CPP_TOOLS_H__
@@ -20,10 +22,18 @@ namespace cpptools {
 #define BOOL    int
 #endif
 
-// ==========
-// general tools
-std::string dump_data_to_string(const void *data, size_t size);
+class Data;
 
+// ==========
+// string tools
+std::string dump_data_to_string(const void *data, size_t size);
+std::string dump_data_to_string(const Data &data);
+std::vector<std::string> split_string(const std::string &string, const std::string &seperator);
+
+// ==========
+// system-up time
+time_t sys_up_time(void);
+struct timeval sys_up_timeval(void);
 
 // ==========
 // data classes

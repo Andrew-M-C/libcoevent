@@ -211,7 +211,7 @@ void andrewmc::libcoevent::convert_str_to_sockaddr_un(const std::string &str, st
 }
 
 
-#endif  // end of libcoevent::print
+#endif  // end of __CO_EVENT_ITNL
 
 
 

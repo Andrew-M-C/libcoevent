@@ -293,7 +293,7 @@ struct Error UDPItnlClient::init(Server *server, struct stCoRoutine_t *coroutine
             break;
     }
 
-    _clear();
+    _init();
     _status.clear_err();
 
     // create arguments and assign coroutine

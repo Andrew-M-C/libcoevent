@@ -5,12 +5,14 @@
 
 #include "co_routine_inner.h"
 #include "co_routine.h"
+#include "cpp_tools.h"
 #include "coevent.h"
 #include <sys/time.h>
 #include <sys/types.h>
 #include <sys/socket.h>
 #include <netinet/in.h>
 #include <sys/un.h>
+#include <stdint.h>
 
 namespace andrewmc {
 namespace libcoevent {
@@ -103,6 +105,54 @@ private:
     void _clear();
 
     struct sockaddr *_remote_addr();
+};
+
+
+// Actual implementation of DNSClient
+class DNSItnlClient : public DNSClient {
+protected:
+    std::map<std::string, DNSResult *>  _dns_result;
+    void            *_event_arg;
+    int             _fd_ipv4;
+    int             _fd_ipv6;
+    int             _fd_unix;
+    int             _fd;
+    uint32_t        *_libevent_what_storage;
+    Server          *_owner_server;
+    uint16_t        _transaction_ID;
+    struct sockaddr_storage     _remote_addr;
+    socklen_t       _remote_addr_len;
+
+public:
+    // construct and descruct functions
+    DNSItnlClient();
+    virtual ~DNSItnlClient();
+    struct Error init(Server *server, struct stCoRoutine_t *coroutine, NetType_t network_type, void *user_arg = NULL);
+
+    // send and receive DNS request
+    NetType_t network_type();
+    struct Error resolve(const std::string &domain_name, double timeout_seconds = 0, const std::string &dns_server_ip = "");
+    struct Error resolve_in_timeval(const std::string &domain_name, const struct timeval &timeout, const std::string &dns_server_ip = "");
+    struct Error resolve_in_milisecs(const std::string &domain_name, unsigned timeout_milisecs, const std::string &dns_server_ip = "");
+
+    // read default DNS server configured in syste
+    std::string default_dns_server(size_t index = 0);
+
+    // misc functions
+    const std::map<std::string, DNSResult *> &result() const;
+    Server *owner_server();
+
+    // remote addr
+    std::string remote_addr();    // valid in IPv4 or IPv6 type
+    unsigned remote_port();       // valid in IPv4 or IPv6 type
+    void copy_remote_addr(struct sockaddr *addr_out, socklen_t addr_len);
+
+private:
+    void _init();
+    void _clear();
+    struct Error _send_dns_request_for(const char *c_domain_name);
+    struct Error _recv_dns_reply(uint8_t *data_buff, size_t buff_len, size_t *recv_len_out);
+    DNSResult *_read_dns_result(const char *c_domain_name);
 };
 
 }   // end of namespace libcoevent

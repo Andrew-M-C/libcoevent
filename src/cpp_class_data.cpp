@@ -13,7 +13,7 @@ using namespace andrewmc::cpptools;
 #define _SIZE_DECREASING_THRESHOLD      (4*1024)
 #define _COEFFICIENT_THRESHOLD  (10)
 
-#define _DB(fmt, args...)   printf("%s, %s(), %d: "fmt, __FILE__, __func__, __LINE__, ##args)
+#define _DB(fmt, args...)   printf("%s, %s(), %d: "fmt"\n", __FILE__, __func__, __LINE__, ##args)
 
 #ifndef FALSE
 #define FALSE   (0)

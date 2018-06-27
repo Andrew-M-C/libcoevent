@@ -237,17 +237,13 @@ static void _sub_udp_routine(evutil_socket_t fd, Event *abs_server, void *arg)
     char data[1024] = "Thank you for your message!";
     size_t recv_len = 0;
 
-    UDPClient *client = server->new_UDP_client(NetIPv4);
-    client->send(data, strlen(data) + 1, NULL, "127.0.0.1", _UDP_PORT_2);
+    DNSClient *dns = server->new_DNS_client(NetIPv4);
+    err = dns->resolve("andrewmc.cn");
 
-    err = client->recv(data, sizeof(data) - 1, &recv_len, 1.5);
-    if (err.is_timeout()) {
-        LOG("recv timeout");
-    }
-    else {
-        data[recv_len] = '\0';
-        client->send(data, strlen(data) + 1, NULL, (struct sockaddr *)addr, sizeof(*addr));
-    }
+    LOG("Test ends");
+    exit(-1);
+
+    // TODO: 添加测试代码
 
     LOG("Sub service ends");
     return;

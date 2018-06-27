@@ -27,6 +27,7 @@ class Base;
 class Event;
 class Client;
 class UDPClient;
+class DNSClient;
 
 
 // network type
@@ -127,8 +128,9 @@ protected:
     std::set<Client *>  _client_chain;
 public:
     virtual ~Server();
+    struct Error delete_client(Client *client);
     UDPClient *new_UDP_client(NetType_t network_type, void *user_arg = NULL);
-    struct Error delete_client(UDPClient *client);
+    DNSClient *new_DNS_client(NetType_t network_type, void *user_arg = NULL);
 protected:
     virtual struct stCoRoutine_t *_coroutine() = 0;
 };
@@ -262,13 +264,14 @@ public:
     virtual ~DNSClient(){};
 
     virtual NetType_t network_type() = 0;
-    virtual struct Error resolve(const std::string domain_name, double timeout_seconds = 0, const std::string &dns_server_ip = "") = 0;
-    virtual struct Error resolve_in_timeval(const std::string domain_name, const struct timeval &timeout, const std::string &dns_server_ip = "") = 0;
-    virtual struct Error resolve_in_milisecs(const std::string domain_name, unsigned timeout_milisecs, const std::string &dns_server_ip = "") = 0;
+    virtual struct Error resolve(const std::string &domain_name, double timeout_seconds = 0, const std::string &dns_server_ip = "") = 0;
+    //virtual struct Error resolve_in_timeval(const std::string &domain_name, const struct timeval &timeout, const std::string &dns_server_ip = "") = 0;
+    //virtual struct Error resolve_in_milisecs(const std::string &domain_name, unsigned timeout_milisecs, const std::string &dns_server_ip = "") = 0;
 
-    virtual std::string default_dns_server(size_t index = 0) = 0;
+    //virtual std::string default_dns_server(size_t index = 0) = 0;
 
-    virtual const std::map<std::string, DNSClient *> &result() = 0;
+    virtual const std::map<std::string, DNSResult *> &result() const = 0;
+    virtual Server *owner_server() = 0;
 };
 
 
@@ -290,7 +293,7 @@ typedef enum {
 class DNSResult {
 protected:
     time_t      _update_time;   // saved as sysup time
-    time_t      _update_ttl;
+    time_t      _update_ttl;    // saved as ttl remains comparing _update_time
     NetType_t   _network_type;
     std::string _domain_name;
 public:
@@ -313,19 +316,19 @@ public:
         rr_type(DnsRRType_Unknown), rr_class(DnsRRClass_Unknown), rr_ttl(0)
     {}
 
-    const std::string &name() {
+    const std::string &record_name() {
         return rr_name;
     }
-    DNSRRType_t type() {
+    DNSRRType_t record_type() {
         return rr_type;
     }
     DNSRRClass_t record_class() {
         return rr_class;
     }
-    uint32_t ttl() {
+    uint32_t record_ttl() {
         return rr_ttl;
     }
-    const std::string &address() {
+    const std::string &record_address() {
         return rr_address;
     }
 };

@@ -27,7 +27,16 @@ UDPClient *Server::new_UDP_client(NetType_t network_type, void *user_arg)
 }
 
 
-struct Error Server::delete_client(UDPClient *client)
+DNSClient *Server::new_DNS_client(NetType_t network_type, void *user_arg)
+{
+    DNSItnlClient *client = new DNSItnlClient;
+    client->init(this, _coroutine(), network_type, user_arg);
+    _client_chain.insert(client);
+    return (DNSClient *)client;
+}
+
+
+struct Error Server::delete_client(Client *client)
 {
     if (NULL == client) {
         _status.set_app_errno(ERR_PARA_NULL);
