@@ -94,6 +94,8 @@ public:
     struct Error recv_in_timeval(void *data_out, const size_t len_limit, size_t *len_out_nullable, const struct timeval &timeout);
     struct Error recv_in_mimlisecs(void *data_out, const size_t len_limit, size_t *len_out_nullable, unsigned timeout_milisecs);
 
+    std::string default_dns_server(size_t index = 0);
+
     std::string remote_addr();    // valid in IPv4 or IPv6 type
     unsigned remote_port();       // valid in IPv4 or IPv6 type
     void copy_remote_addr(struct sockaddr *addr_out, socklen_t addr_len);
@@ -136,10 +138,10 @@ public:
     struct Error resolve_in_milisecs(const std::string &domain_name, unsigned timeout_milisecs, const std::string &dns_server_ip = "");
 
     // read default DNS server configured in syste
-    std::string default_dns_server(size_t index = 0);
+    std::string default_dns_server(size_t index = 0, NetType_t *network_type_out = NULL);
 
     // misc functions
-    const std::map<std::string, DNSResult *> &result() const;
+    const DNSResult *dns_result(const std::string &domain_name);
     Server *owner_server();
 
     // remote addr
@@ -150,8 +152,8 @@ public:
 private:
     void _init();
     void _clear();
-    struct Error _send_dns_request_for(const char *c_domain_name);
-    struct Error _recv_dns_reply(uint8_t *data_buff, size_t buff_len, size_t *recv_len_out);
+    struct Error _send_dns_request_for(const char *c_domain_name, const struct sockaddr *addr, socklen_t addr_len);
+    struct Error _recv_dns_reply(uint8_t *data_buff, size_t buff_len, size_t *recv_len_out, const struct timeval *timeout);
     DNSResult *_read_dns_result(const char *c_domain_name);
 };
 

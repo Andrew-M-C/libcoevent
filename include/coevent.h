@@ -268,9 +268,9 @@ public:
     //virtual struct Error resolve_in_timeval(const std::string &domain_name, const struct timeval &timeout, const std::string &dns_server_ip = "") = 0;
     //virtual struct Error resolve_in_milisecs(const std::string &domain_name, unsigned timeout_milisecs, const std::string &dns_server_ip = "") = 0;
 
-    //virtual std::string default_dns_server(size_t index = 0) = 0;
+    virtual std::string default_dns_server(size_t index = 0, NetType_t *network_type_out = NULL) = 0;
 
-    virtual const std::map<std::string, DNSResult *> &result() const = 0;
+    virtual const DNSResult *dns_result(const std::string &domain_name) = 0;
     virtual Server *owner_server() = 0;
 };
 

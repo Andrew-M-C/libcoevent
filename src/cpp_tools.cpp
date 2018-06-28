@@ -9,7 +9,7 @@
 
 using namespace andrewmc::cpptools;
 
-#define _DB(fmt, args...)   printf("%s, %s(), %d: "fmt"\n", __FILE__, __func__, __LINE__, ##args)
+#define _DB(fmt, args...)   //printf("%s, %s(), %d: "fmt"\n", __FILE__, __func__, __LINE__, ##args)
 
 // ==========
 #define __STRING_TOOLS
