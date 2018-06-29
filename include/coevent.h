@@ -271,7 +271,6 @@ public:
     virtual std::string default_dns_server(size_t index = 0, NetType_t *network_type_out = NULL) = 0;
 
     virtual const DNSResult *dns_result(const std::string &domain_name) = 0;
-    virtual Server *owner_server() = 0;
 };
 
 
@@ -291,14 +290,15 @@ typedef enum {
 
 
 class DNSResult {
-protected:
+public:
     time_t      _update_time;   // saved as sysup time
     time_t      _update_ttl;    // saved as ttl remains comparing _update_time
-    NetType_t   _network_type;
     std::string _domain_name;
+    std::vector<DNSResourceRecord *> _rr_list;
 public:
-    const std::string &domain_name();
-    const std::vector<DNSResourceRecord *> &resource_record_list();
+    DNSResult();
+    virtual ~DNSResult();
+    const std::string &domain_name() const;
     std::vector<std::string> IP_addresses();
     time_t time_to_live();
 };
@@ -306,31 +306,21 @@ public:
 
 class DNSResourceRecord {
 public:
-    std::string     rr_name;
-    DNSRRType_t     rr_type;
-    DNSRRClass_t    rr_class;
-    uint32_t        rr_ttl;
-    std::string     rr_address;
+    std::string     _rr_name;
+    DNSRRType_t     _rr_type;
+    DNSRRClass_t    _rr_class;
+    uint32_t        _rr_ttl;
+    std::string     _rr_address;
 public:
     DNSResourceRecord():
-        rr_type(DnsRRType_Unknown), rr_class(DnsRRClass_Unknown), rr_ttl(0)
+        _rr_type(DnsRRType_Unknown), _rr_class(DnsRRClass_Unknown), _rr_ttl(0)
     {}
 
-    const std::string &record_name() {
-        return rr_name;
-    }
-    DNSRRType_t record_type() {
-        return rr_type;
-    }
-    DNSRRClass_t record_class() {
-        return rr_class;
-    }
-    uint32_t record_ttl() {
-        return rr_ttl;
-    }
-    const std::string &record_address() {
-        return rr_address;
-    }
+    const std::string &record_name() const;
+    DNSRRType_t record_type() const;
+    DNSRRClass_t record_class() const;
+    uint32_t record_ttl() const;
+    const std::string &record_address() const;
 };
 
 

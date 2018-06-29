@@ -114,16 +114,8 @@ private:
 class DNSItnlClient : public DNSClient {
 protected:
     std::map<std::string, DNSResult *>  _dns_result;
-    void            *_event_arg;
-    int             _fd_ipv4;
-    int             _fd_ipv6;
-    int             _fd_unix;
-    int             _fd;
-    uint32_t        *_libevent_what_storage;
-    Server          *_owner_server;
+    UDPItnlClient   *_udp_client;
     uint16_t        _transaction_ID;
-    struct sockaddr_storage     _remote_addr;
-    socklen_t       _remote_addr_len;
 
 public:
     // construct and descruct functions
@@ -151,10 +143,8 @@ public:
 
 private:
     void _init();
-    void _clear();
     struct Error _send_dns_request_for(const char *c_domain_name, const struct sockaddr *addr, socklen_t addr_len);
     struct Error _recv_dns_reply(uint8_t *data_buff, size_t buff_len, size_t *recv_len_out, const struct timeval *timeout);
-    DNSResult *_read_dns_result(const char *c_domain_name);
 };
 
 }   // end of namespace libcoevent

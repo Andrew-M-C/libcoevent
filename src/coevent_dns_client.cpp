@@ -36,18 +36,6 @@ std::vector<NetType_t> g_DNS_network_type;
 #define __CO_EVENT_DNS_CLIENT_DEFINITIONS
 #ifdef __CO_EVENT_DNS_CLIENT_DEFINITIONS
 
-struct _EventArg {
-    DNSItnlClient       *event;
-    int                 fd;
-    uint32_t            *libevent_what_ptr;
-
-    struct stCoRoutine_t *coroutine;
-    void                *user_arg;
-
-    _EventArg(): event(NULL), fd(0), libevent_what_ptr(NULL), coroutine(NULL)
-    {}
-};
-
 
 struct _DNSQueryText
 {
@@ -125,40 +113,6 @@ struct _DNSQueryText
 
 
 // ==========
-// libevent style callback, this callback is second part of the coroutine adapter
-#define __DNS_CLIENT_SERVER_CALLBACK
-#ifdef __DNS_CLIENT_SERVER_CALLBACK
-
-static void _libevent_callback(evutil_socket_t fd, short what, void *libevent_arg)
-{
-    struct _EventArg *arg = (struct _EventArg *)libevent_arg;
-
-    // switch into the coroutine
-    if (arg->libevent_what_ptr) {
-        *(arg->libevent_what_ptr) = (uint32_t)what;
-        DEBUG("libevent what: 0x%08x - %s%s", (unsigned)what, event_is_timeout(what) ? "timeout " : "", event_readable(what) ? "read" : "");
-    }
-    co_resume(arg->coroutine);
-
-    // is coroutine end?
-    if (is_coroutine_end(arg->coroutine)) {
-        // delete the event if this is under control of the base
-        DNSItnlClient *client = arg->event;
-        Server *server = client->owner_server();
-        Base *base = client->owner();
-
-        DEBUG("Server %s ends", server->identifier().c_str());
-        base->delete_event_under_control(server);
-    }
-
-    // done
-    return;
-}
-
-#endif  // end of __DNS_CLIENT_SERVER_CALLBACK
-
-
-// ==========
 #define __CONSTRUCT_AND_DESTRUCTION
 #ifdef __CONSTRUCT_AND_DESTRUCTION
 
@@ -171,12 +125,12 @@ DNSItnlClient::DNSItnlClient()
 
 DNSItnlClient::~DNSItnlClient()
 {
-    _clear();
-
-    if (_libevent_what_storage) {
-        free(_libevent_what_storage);
-        _libevent_what_storage = NULL;
+    if (_udp_client)
+    {
+        delete _udp_client;
+        _udp_client = NULL;
     }
+
     return;
 }
 
@@ -187,72 +141,8 @@ void DNSItnlClient::_init()
     sprintf(identifier, "DNS client %p", this);
     _identifier = identifier;
 
-    _fd_ipv4 = 0;
-    _fd_ipv6 = 0;
-    _fd_unix = 0;
-    _fd = 0;
-    _event_arg = NULL;
-    _owner_server = NULL;
-    _libevent_what_storage = NULL;
+    _udp_client = NULL;
     _transaction_ID = 0;
-    _status.clear_err();
-
-    _clear();
-
-    _libevent_what_storage = (uint32_t *)malloc(sizeof(*_libevent_what_storage));
-    if (NULL == _libevent_what_storage) {
-        ERROR("Failed to init storage");
-        throw std::bad_alloc();
-    }
-    else {
-        *_libevent_what_storage = 0;
-    }
-
-    return;
-}
-
-
-void DNSItnlClient::_clear()
-{
-    if (_event) {
-        DEBUG("Delete DNS client event");
-        event_del(_event);
-        _event = NULL;
-    }
-
-    if (_event_arg) {
-        struct _EventArg *arg = (struct _EventArg *)_event_arg;
-        _event_arg = NULL;
-
-        // do not remove coroutine because client does not own it
-
-        DEBUG("Delete _event_arg");
-        free(arg);
-    }
-
-    if (_fd_ipv4) {
-        close(_fd_ipv4);
-    }
-    else if (_fd_ipv6) {
-        close(_fd_ipv6);
-    }
-    else if (_fd_unix) {
-        close(_fd_unix);
-    }
-
-    for (std::map<std::string, DNSResult *>::iterator each_dns = _dns_result.begin();
-        each_dns != _dns_result.end();
-        each_dns ++)
-    {
-        delete *each_dns;
-    }
-    _dns_result.clear();
-
-    _fd = 0;
-    _event_arg = NULL;
-    _fd_ipv4 = 0;
-    _fd_ipv6 = 0;
-    _fd_unix = 0;
     return;
 }
 
@@ -264,107 +154,9 @@ struct Error DNSItnlClient::init(Server *server, struct stCoRoutine_t *coroutine
         return _status;
     }
 
-    switch(network_type)
-    {
-        case NetIPv4:
-        case NetIPv6:
-            // OK
-            break;
-
-        case NetLocal:
-        case NetUnknown:
-        default:
-            // Illegal
-            _status.set_app_errno(ERR_NETWORK_TYPE_ILLEGAL);
-            return _status;
-            break;
-    }
-
     _init();
-    _status.clear_err();
-
-    // create arguments and assign coroutine
-    int fd = 0;
-    struct sockaddr_in addr4;
-    struct sockaddr_in6 addr6;
-    struct sockaddr *addr = NULL;
-    socklen_t addr_len = 0;
-
-    struct _EventArg *arg = (struct _EventArg *)malloc(sizeof(*arg));
-    if (NULL == arg) {
-        _clear();
-        _status.set_sys_errno();
-        return _status;
-    }
-
-    _event_arg = arg;
-    arg->event = this;
-    arg->user_arg = user_arg;
-    arg->libevent_what_ptr = _libevent_what_storage;
-    arg->coroutine = coroutine;
-
-    // create file descriptor
-    if (NetIPv4 == network_type)
-    {
-        addr4.sin_family = AF_INET;
-        addr4.sin_port = 0;
-        addr4.sin_addr.s_addr = htonl(INADDR_ANY);
-
-        _fd_ipv4 = socket(AF_INET, SOCK_DGRAM, 0);
-        fd = _fd_ipv4;
-        addr = (struct sockaddr *)(&addr4);
-        addr_len = sizeof(addr4);
-    }
-    else    // NetIPv6
-    {
-        addr6.sin6_family = AF_INET6;
-        addr6.sin6_port = 0;
-        addr6.sin6_addr = in6addr_any;
-
-        _fd_ipv6 = socket(AF_INET6, SOCK_DGRAM, 0);
-        fd = _fd_ipv6;
-        addr = (struct sockaddr *)(&addr6);
-        addr_len = sizeof(addr6);
-    }
-
-    if (fd <= 0) {
-        _clear();
-        _status.set_sys_errno(errno);
-        return _status;
-    }
-    else {
-        _fd = fd;
-    }
-
-    // try binding
-    int status = bind(fd, addr, addr_len);
-    if (status < 0) {
-        _clear();
-        _status.set_sys_errno(errno);
-        return _status;
-    }
-
-    // non-block
-    set_fd_nonblock(fd);
-
-    // create event
-    _owner_server = server;
-    _owner_base = server->owner();
-    _event = event_new(_owner_base->event_base(), fd, EV_TIMEOUT | EV_READ, _libevent_callback, arg);
-    if (NULL == _event) {
-        ERROR("Failed to new a UDP event");
-        _clear();
-        _status.set_app_errno(ERR_EVENT_EVENT_NEW);
-        return _status;
-    }
-    else {
-        // Do NOT need to auto_free because auto_free is done in this class
-        // base->put_event_under_control(this);
-    }
-
-    // This event will not be added to base now. It will be done later in recv operations
-
-    // done
+    _udp_client = new UDPItnlClient;
+    _status = _udp_client->init(server, coroutine, network_type, user_arg);
     return _status;
 }
 
@@ -384,19 +176,23 @@ const DNSResult *DNSItnlClient::dns_result(const std::string &domain_name)
     }
 
     // check if the object is valid
-    if (0 == dns_item->time_to_live())  {
+    if (0 == dns_item->second->time_to_live())  {
         _dns_result.erase(dns_item);
         return NULL;
     }
     else {
-        return &(*dns_item);
+        return dns_item->second;
     }
 }
 
 
 Server *DNSItnlClient::owner_server()
 {
-    return _owner_server;
+    if (_udp_client) {
+        return _udp_client->owner_server();
+    } else {
+        return NULL;
+    }
 }
 
 
@@ -430,23 +226,15 @@ struct Error DNSItnlClient::_send_dns_request_for(const char *c_domain_name, con
 
     DEBUG("Get request data: %s", dump_data_to_string(query_data).c_str());
 
-    ssize_t send_ret = sendto(_fd, query_data.c_data(), query_data.length(), 0, addr, addr_len);
-    if (send_ret < 0) {
-        _status.set_sys_errno();
-    }
-
+    _status = _udp_client->send(query_data.c_data(), query_data.length(), NULL, addr, addr_len);
     return _status;
 }
 
 
-struct Error _recv_dns_reply(uint8_t *data_buff, size_t buff_len, size_t *recv_len_out, const struct timeval *timeout)
+struct Error DNSItnlClient::_recv_dns_reply(uint8_t *data_buff, size_t buff_len, size_t *recv_len_out, const struct timeval *timeout)
 {
-    if (!(data_buff && recv_len_out && timeout)) {
-        _status.set_app_errno(ERR_PARA_NULL);
-        return _status;
-    }
-
-    
+    _status = _udp_client->recv_in_timeval(data_buff, buff_len, recv_len_out, *timeout);
+    return _status;
 }
 
 
@@ -459,12 +247,8 @@ struct Error _recv_dns_reply(uint8_t *data_buff, size_t buff_len, size_t *recv_l
 
 NetType_t DNSItnlClient::network_type()
 {
-    if (_fd_ipv4) {
-        return NetIPv4;
-    } else if (_fd_ipv6) {
-        return NetIPv6;
-    } else if (_fd_unix) {
-        return NetLocal;
+    if (_udp_client) {
+        return _udp_client->network_type();
     } else {
         return NetUnknown;
     }
@@ -478,7 +262,7 @@ struct Error DNSItnlClient::resolve(const std::string &domain_name, double timeo
 }
 
 
-struct Error DNSItnlClient::resolve_in_timeval(const std::string &domain_name, const struct timeval &timeout, const std::string &dns_server_ip)
+struct Error DNSItnlClient::resolve_in_timeval(const std::string &domain_name, const struct timeval &timeout_orig, const std::string &dns_server_ip)
 {
     std::string dns_ip = std::string(dns_server_ip);
 
@@ -546,9 +330,45 @@ struct Error DNSItnlClient::resolve_in_timeval(const std::string &domain_name, c
     }
 
     // recv and resolve
-    // TODO:
+    size_t recv_size = 0;
+    uint8_t data_buff[2048];
+    struct timeval now_time = ::andrewmc::cpptools::sys_up_timeval();
+    struct timeval end_time;
+    struct timeval remain_time;
+    BOOL should_recv_forever = FALSE;
+    BOOL should_continue_recv = TRUE;
 
-    // TODO:
+    if (0 == timeout_orig.tv_sec && 0 == timeout_orig.tv_usec)
+    {
+        should_recv_forever = TRUE;
+        end_time.tv_sec = FOREVER_SECONDS;
+        end_time.tv_usec = 0;
+        remain_time.tv_sec = FOREVER_SECONDS;
+        remain_time.tv_usec = 0;
+    }
+    else {
+        should_recv_forever = FALSE;
+        timeradd(&now_time, &timeout_orig, &end_time);
+        remain_time.tv_sec = timeout_orig.tv_sec;
+        remain_time.tv_usec = timeout_orig.tv_usec;
+    }
+
+    // recv
+    do {
+        recv_size = 0;
+        _recv_dns_reply(data_buff, sizeof(data_buff), &recv_size, &remain_time);
+
+        if (FALSE == _status.is_ok()) {
+            should_continue_recv = FALSE;
+        }
+        else {
+            // TODO: resolve DNS data
+        }   // end of if (FALSE == _status.is_ok())
+
+    }
+    while (should_continue_recv);
+
+    // return
     return _status;
 }
 #endif  // end of __DNS_PUBLIC_FUNCTIONS
@@ -560,21 +380,19 @@ struct Error DNSItnlClient::resolve_in_timeval(const std::string &domain_name, c
 
 std::string DNSItnlClient::remote_addr()
 {
-    // TODO: 
-    return "";
+    return _udp_client->remote_addr();
 }
 
 
 unsigned DNSItnlClient::remote_port()
 {
-    // TODO:
-    return 0;
+    return _udp_client->remote_port();
 }
 
 
 void DNSItnlClient::copy_remote_addr(struct sockaddr *addr_out, socklen_t addr_len)
 {
-    // TODO:
+    _udp_client->copy_remote_addr(addr_out, addr_len);
     return;
 }
 
