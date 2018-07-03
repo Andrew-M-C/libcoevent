@@ -8,6 +8,10 @@
 
 using namespace andrewmc::libcoevent;
 
+// ==========
+#define __INTERNAL_FUNCTIONS
+#ifdef __INTERNAL_FUNCTIONS
+
 struct _DNSPayloadHeader {
     uint16_t    transacton_ID;
     uint16_t    flags;
@@ -17,11 +21,7 @@ struct _DNSPayloadHeader {
     uint16_t    additional_rrs;
 };
 
-// ==========
-// class DNSResult
-#define __CLASS_DNS_RESULT
-#ifdef __CLASS_DNS_RESULT
-
+#if 0
 static ssize_t _search_next_zero_byte(const uint8_t *data, size_t offset, size_t length)
 {
     while(0 != data[offset])
@@ -33,9 +33,9 @@ static ssize_t _search_next_zero_byte(const uint8_t *data, size_t offset, size_t
     }
     return offset;
 }
+#endif
 
-
-static BOOL _read_RR_name_data(::andrewmc::cpptools::Data &buff_out, const uint8_t *data, size_t offset, const size_t length, size_t *end_pos_out)
+static BOOL _read_RR_name(::andrewmc::cpptools::Data &buff_out, const uint8_t *data, size_t offset, const size_t length, size_t *end_pos_out)
 {
     const char DOT = '.';
     BOOL should_end_searching = FALSE;
@@ -65,7 +65,7 @@ static BOOL _read_RR_name_data(::andrewmc::cpptools::Data &buff_out, const uint8
             uint16_t name_pointer = ((uint16_t)(part_len & ~(0xC0))) << 8;
             name_pointer += data[offset + 1];
             offset += 2;
-            if (FALSE == _read_RR_name_data(buff_out, data, name_pointer, length, NULL))
+            if (FALSE == _read_RR_name(buff_out, data, name_pointer, length, NULL))
             {
                 return FALSE;
             }
@@ -86,7 +86,7 @@ static std::string _parse_query_RR(const uint8_t *data, size_t offset, const siz
     ::andrewmc::cpptools::Data data_buff;
     size_t next_pos = offset;
     const uint8_t STR_END_BYTE = 0;
-    BOOL read_RR_status = _read_RR_name_data(data_buff, data, offset, length, &next_pos);
+    BOOL read_RR_status = _read_RR_name(data_buff, data, offset, length, &next_pos);
 
     if (FALSE == read_RR_status) {
         return "";
@@ -101,6 +101,81 @@ static std::string _parse_query_RR(const uint8_t *data, size_t offset, const siz
     return std::string((char *)(data_buff.c_data()));
 }
 
+
+static DNSResourceRecord *_parse_a_query_answer(const uint8_t *data, size_t offset, const size_t length, size_t *next_pos_out)
+{
+    ::andrewmc::cpptools::Data data_buff;
+    const uint8_t STR_END_BYTE = 0;
+    DNSResourceRecord *the_RR = new DNSResourceRecord;
+    uint16_t sect_16;
+    uint32_t sect_32;
+
+    if (_read_RR_name(data_buff, data, offset, length, &offset))
+    {
+        data_buff.append(&STR_END_BYTE, sizeof(STR_END_BYTE));
+        the_RR->_rr_name = (const char *)(data_buff.c_data());
+    }
+    else
+    {
+        return the_RR;
+    }
+
+    // Type
+    memcpy(&sect_16, data + offset, sizeof(sect_16));
+    offset += sizeof(sect_16);
+    the_RR->_rr_type = (DNSRRType_t)ntohs(sect_16);
+
+    // Class
+    memcpy(&sect_16, data + offset, sizeof(sect_16));
+    offset += sizeof(sect_16);
+    the_RR->_rr_class = (DNSRRClass_t)ntohs(sect_16);
+
+    // TTL
+    memcpy(&sect_32, data + offset, sizeof(sect_32));
+    offset += sizeof(sect_32);
+    the_RR->_rr_ttl = (uint32_t)ntohl(sect_32);
+
+    // Data Length
+    memcpy(&sect_16, data + offset, sizeof(sect_16));
+    offset += sizeof(sect_16);
+    if (next_pos_out) {
+        *next_pos_out = offset + ntohs(sect_16);     // data length
+    }
+
+    // Address
+    switch (the_RR->record_type())
+    {
+        case DnsRRType_CName:
+            data_buff.clear();
+            if (_read_RR_name(data_buff, data, offset, length, NULL))
+            {
+                data_buff.append(&STR_END_BYTE, sizeof(STR_END_BYTE));
+                the_RR->_rr_address = (const char *)(data_buff.c_data());
+            }
+            break;
+        case DnsRRType_IPv4Addr:
+            the_RR->_rr_address = str_from_sin_addr((const struct in_addr *)(data + offset));
+            break;
+        case DnsRRType_IPv6Addr:
+            the_RR->_rr_address = str_from_sin6_addr((const struct in6_addr *)(data + offset));
+            break;
+        case DnsRRType_Unknown:
+        default:
+            ERROR("Unsupported record type %u", (unsigned)(the_RR->record_type()));
+            break;
+    }
+
+    return the_RR;
+}
+
+
+#endif
+
+
+// ==========
+// class DNSResult
+#define __CLASS_DNS_RESULT
+#ifdef __CLASS_DNS_RESULT
 
 DNSResult::DNSResult()
 {
@@ -194,6 +269,19 @@ BOOL DNSResult::parse_from_udp_payload(const void *bytes, const size_t length)
     else {
         DEBUG("Got domain name: %s", _domain_name.c_str());
     }
+
+    // read answers
+    _update_ttl = 0x7FFFFFFF;
+    for (unsigned index = 0; index < header.answer_rrs; index ++)
+    {
+        DNSResourceRecord *an_RR = _parse_a_query_answer(data, offset, length, &offset);
+        if (an_RR->record_ttl() < _update_ttl) {
+            _update_ttl = an_RR->record_ttl();
+        }
+        _rr_list.push_back(an_RR);
+        DEBUG("Got record: %s", an_RR->record_address().c_str());
+    }
+    // TODO:
 
     // TODO:
     return TRUE;

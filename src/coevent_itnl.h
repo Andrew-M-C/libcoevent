@@ -63,6 +63,10 @@ void convert_str_to_sockaddr_in(const std::string &str, unsigned port, struct so
 void convert_str_to_sockaddr_in6(const std::string &str, unsigned port, struct sockaddr_in6 *addr_out);
 void convert_str_to_sockaddr_un(const std::string &str, struct sockaddr_un *addr_out);
 
+// sockaddr to string
+std::string str_from_sin_addr(const struct in_addr *addr);
+std::string str_from_sin6_addr(const struct in6_addr *addr6);
+
 // Actual implementation of UDPClient
 class UDPItnlClient : public UDPClient
 {

@@ -211,6 +211,28 @@ void andrewmc::libcoevent::convert_str_to_sockaddr_un(const std::string &str, st
 }
 
 
+std::string andrewmc::libcoevent::str_from_sin_addr(const struct in_addr *addr)
+{
+    if (NULL == addr) {
+        return "";
+    }
+    char c_str[INET_ADDRSTRLEN] = "";
+    inet_ntop(AF_INET, addr, c_str, sizeof(c_str));
+    return std::string(c_str);
+}
+
+
+std::string andrewmc::libcoevent::str_from_sin6_addr(const struct in6_addr *addr6)
+{
+    if (NULL == addr6) {
+        return "";
+    }
+    char c_str[INET6_ADDRSTRLEN] = "";
+    inet_ntop(AF_INET6, addr6, c_str, sizeof(c_str));
+    return std::string(c_str);
+}
+
+
 #endif  // end of __CO_EVENT_ITNL
 
 

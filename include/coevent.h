@@ -276,16 +276,16 @@ public:
 
 // DNSResult for DNSClient
 typedef enum {
-    DnsRRType_Unknown = 0,
-    DnsRRType_IPv4Addr,
-    DnsRRType_IPv6Addr,
-    DnsRRType_ServerName,
-    DnsRRType_CName,
+    DnsRRType_Unknown   = 0,
+    DnsRRType_IPv4Addr  = 1,
+    DnsRRType_IPv6Addr  = 28,
+    DnsRRType_ServerName = 2,
+    DnsRRType_CName     = 5,
 } DNSRRType_t;
 
 typedef enum {
     DnsRRClass_Unknown = 0,
-    DnsRRClass_Internet,
+    DnsRRClass_Internet = 1,
 } DNSRRClass_t;
 
 
