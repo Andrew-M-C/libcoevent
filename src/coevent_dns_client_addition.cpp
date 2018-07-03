@@ -145,6 +145,7 @@ static DNSResourceRecord *_parse_a_query_answer(const uint8_t *data, size_t offs
     // Address
     switch (the_RR->record_type())
     {
+        case DnsRRType_ServerName:
         case DnsRRType_CName:
             data_buff.clear();
             if (_read_RR_name(data_buff, data, offset, length, NULL))
@@ -279,9 +280,27 @@ BOOL DNSResult::parse_from_udp_payload(const void *bytes, const size_t length)
             _update_ttl = an_RR->record_ttl();
         }
         _rr_list.push_back(an_RR);
-        DEBUG("Got record: %s", an_RR->record_address().c_str());
+        DEBUG("Got record: %s -- %s (TTL: %u)", an_RR->record_name().c_str(), an_RR->record_address().c_str(), (unsigned)an_RR->record_ttl());
     }
-    // TODO:
+
+    // read authority RRs
+    for (unsigned index = 0; index < header.authority_rrs; index ++)
+    {
+        DNSResourceRecord *an_RR = _parse_a_query_answer(data, offset, length, &offset);
+        _rr_list.push_back(an_RR);
+        DEBUG("Got record: %s -- %s (TTL: %u)", an_RR->record_name().c_str(), an_RR->record_address().c_str(), (unsigned)an_RR->record_ttl());
+    }
+
+    // read additional RRs
+    for (unsigned index = 0; index < header.additional_rrs; index ++)
+    {
+        DNSResourceRecord *an_RR = _parse_a_query_answer(data, offset, length, &offset);
+        _rr_list.push_back(an_RR);
+        DEBUG("Got record: %s -- %s (TTL: %u)", an_RR->record_name().c_str(), an_RR->record_address().c_str(), (unsigned)an_RR->record_ttl());
+    }
+
+    // check TTL
+    DEBUG("TTL: %u", (unsigned)_update_ttl);
 
     // TODO:
     return TRUE;
