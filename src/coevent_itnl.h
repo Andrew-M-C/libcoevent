@@ -25,13 +25,14 @@ namespace libcoevent {
 ssize_t print(int fd, const char *format, ...);
 
 #if DEBUG_FLAG
-#define DEBUG(fmt, args...)   print(1, "%s, %s(), %d: "fmt, __FILE__, __func__, __LINE__, ##args)
+#define DEBUG(fmt, args...)   print(1, "DEBUG - %s, %s(), %d: "fmt, __FILE__, __func__, __LINE__, ##args)
+#define INFO(fmt, args...)    print(1, "INFO  - %s, %s(), %d: "fmt, __FILE__, __func__, __LINE__, ##args)
+#define ERROR(fmt, args...)   print(2, "ERROR - %s, %s(), %d: "fmt, __FILE__, __func__, __LINE__, ##args)
 #else
 #define DEBUG(fmt, args...)
+#define INFO(fmt, args...)    print(1, fmt, ##args)
+#define ERROR(fmt, args...)   print(2, fmt, ##args)
 #endif
-
-#define INFO(fmt, args...)    print(1, "%s", fmt, ##args)
-#define ERROR(fmt, args...)   print(1, "%s", fmt, ##args)
 
 // to_timeval()
 struct timeval to_timeval(double seconds);
@@ -114,8 +115,8 @@ private:
 class DNSItnlClient : public DNSClient {
 protected:
     std::map<std::string, DNSResult *>  _dns_result;
-    UDPItnlClient   *_udp_client;
-    uint16_t        _transaction_ID;
+    UDPItnlClient                       *_udp_client;
+    static uint16_t                     _transaction_ID;
 
 public:
     // construct and descruct functions
@@ -144,7 +145,7 @@ public:
 private:
     void _init();
     struct Error _send_dns_request_for(const char *c_domain_name, const struct sockaddr *addr, socklen_t addr_len);
-    struct Error _recv_dns_reply(uint8_t *data_buff, size_t buff_len, size_t *recv_len_out, const struct timeval *timeout);
+    void _parse_dns_response(const uint8_t *c_data, size_t data_len);
 };
 
 }   // end of namespace libcoevent

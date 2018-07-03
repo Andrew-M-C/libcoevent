@@ -110,7 +110,7 @@ void UDPItnlClient::_init()
         }
         else {
             *_libevent_what_storage = 0;
-            DEBUG("Init _libevent_what_storage OK: %p", _libevent_what_storage);
+            //DEBUG("Init _libevent_what_storage OK: %p", _libevent_what_storage);
         }
     }
     return;
@@ -514,6 +514,9 @@ struct Error UDPItnlClient::recv_in_timeval(void *data_out, const size_t len_lim
         recv_len = recv_from(_fd, data_out, len_limit, 0, _remote_addr(), &_remote_addr_len);
         if (recv_len < 0) {
             _status.set_sys_errno();
+        }
+        else if (0 == recv_len) {
+            *_libevent_what_storage &=~ (EV_READ);
         }
     }
     else {

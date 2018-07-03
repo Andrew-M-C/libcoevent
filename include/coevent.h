@@ -265,8 +265,8 @@ public:
 
     virtual NetType_t network_type() = 0;
     virtual struct Error resolve(const std::string &domain_name, double timeout_seconds = 0, const std::string &dns_server_ip = "") = 0;
-    //virtual struct Error resolve_in_timeval(const std::string &domain_name, const struct timeval &timeout, const std::string &dns_server_ip = "") = 0;
-    //virtual struct Error resolve_in_milisecs(const std::string &domain_name, unsigned timeout_milisecs, const std::string &dns_server_ip = "") = 0;
+    virtual struct Error resolve_in_timeval(const std::string &domain_name, const struct timeval &timeout, const std::string &dns_server_ip = "") = 0;
+    virtual struct Error resolve_in_milisecs(const std::string &domain_name, unsigned timeout_milisecs, const std::string &dns_server_ip = "") = 0;
 
     virtual std::string default_dns_server(size_t index = 0, NetType_t *network_type_out = NULL) = 0;
 
@@ -301,6 +301,7 @@ public:
     const std::string &domain_name() const;
     std::vector<std::string> IP_addresses();
     time_t time_to_live();
+    BOOL parse_from_udp_payload(const void *data, const size_t length);
 };
 
 

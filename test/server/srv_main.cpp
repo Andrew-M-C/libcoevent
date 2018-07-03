@@ -238,9 +238,15 @@ static void _sub_udp_routine(evutil_socket_t fd, Event *abs_server, void *arg)
     size_t recv_len = 0;
 
     DNSClient *dns = server->new_DNS_client(NetIPv4);
-    err = dns->resolve("andrewmc.cn");
+    NetType_t type;
 
-    LOG("Test ends");
+    LOG("Default DNS server 1: %s(%d)", dns->default_dns_server(0, &type).c_str(), type);
+    LOG("Default DNS server 2: %s(%d)", dns->default_dns_server(1, &type).c_str(), type);
+
+    err = dns->resolve("www.baidu.com", 1.0);
+    LOG("resolve result: %s", err.c_err_msg());
+    LOG("remote address: %s:%u", dns->remote_addr().c_str(), dns->remote_port());
+    LOG("Test ends, now exit process");
     exit(-1);
 
     // TODO: 添加测试代码

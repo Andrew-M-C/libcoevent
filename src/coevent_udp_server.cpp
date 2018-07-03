@@ -591,6 +591,9 @@ struct Error UDPServer::recv_in_timeval(void *data_out, const size_t len_limit, 
             if (recv_len < 0) {
                 _status.set_sys_errno();
             }
+            else if (0 == recv_len) {
+                *_libevent_what_storage &=~ (EV_READ);
+            }
         }
         else if (event_is_timeout(libevent_what))
         {

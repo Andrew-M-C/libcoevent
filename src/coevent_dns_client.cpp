@@ -22,9 +22,12 @@ using namespace andrewmc::libcoevent;
 #define __STATIC_PARAMETERS
 #ifdef __STATIC_PARAMETERS
 
+uint16_t DNSItnlClient::_transaction_ID = 0;
+
 // DNS config file stat. If the file is updated, we should reload
 // reference: [IPv6/IPv4 Address Embedding](http://www.tcpipguide.com/free/t_IPv6IPv4AddressEmbedding.htm)
 // reference: [Setting Up the resolv.conf File](https://docs.oracle.com/cd/E19683-01/817-4843/dnsintro-ex-32/index.html)
+// reference: [DNS 报文结构和个人 DNS 解析代码实现——解决 getaddrinfo() 阻塞问题](https://segmentfault.com/a/1190000009369381)
 static struct timespec g_DNS_file_modifed_time = {0, 0};
 std::vector<std::string> g_DNS_IPs;
 std::vector<NetType_t> g_DNS_network_type;
@@ -36,6 +39,7 @@ std::vector<NetType_t> g_DNS_network_type;
 #define __CO_EVENT_DNS_CLIENT_DEFINITIONS
 #ifdef __CO_EVENT_DNS_CLIENT_DEFINITIONS
 
+#define _DNS_HEADER_LENGTH      (12)
 
 struct _DNSQueryText
 {
@@ -81,14 +85,17 @@ struct _DNSQueryText
         return;
     }
 
-    void serialize_to_data(::andrewmc::cpptools::Data &data)
+    void serialize_to_data(::andrewmc::cpptools::Data &data, NetType_t network_type)
     {
-        char header[sizeof(struct _DNSQueryText) - sizeof(query)];
+        char header[_DNS_HEADER_LENGTH];
         data.clear();
 
+        // header
         memcpy(header, this, sizeof(header));
         data.append((void *)header, sizeof(header));
 
+        // RR name
+        const uint8_t null_char = '\0';
         char rr_name[query.length() + 1];
         std::vector<std::string> name_parts = ::andrewmc::cpptools::split_string(query, ".");
         size_t rr_index = 0;
@@ -104,7 +111,33 @@ struct _DNSQueryText
         }
 
         data.append((void *)rr_name, sizeof(rr_name));
+        data.append((void *)(&null_char), sizeof(null_char));
+
+        // RR type
+        uint16_t rr_type = 0;
+        if (NetIPv4 == network_type) {
+            rr_type = htons(1);     // "A"
+        } else if (NetIPv6 == network_type) {
+            rr_type = htons(28);    // "AAAA"
+        }
+        data.append((void *)(&rr_type), sizeof(rr_type));
+
+        // RR class
+        uint16_t rr_class = htons(0x0001);
+        data.append((void *)(&rr_class), sizeof(rr_class));
         return;
+    }
+
+    unsigned error_code()
+    {
+        uint16_t host_flags = ntohs(flags);
+        host_flags &= 0x000F;
+        return (unsigned)host_flags;
+    }
+
+    size_t answer_RR_count()
+    {
+        return ntohs(answer_rrs);
     }
 
 };
@@ -142,7 +175,6 @@ void DNSItnlClient::_init()
     _identifier = identifier;
 
     _udp_client = NULL;
-    _transaction_ID = 0;
     return;
 }
 
@@ -220,9 +252,11 @@ struct Error DNSItnlClient::_send_dns_request_for(const char *c_domain_name, con
     ::andrewmc::cpptools::Data query_data;
     _DNSQueryText query;
     query.set_as_query_type();
-    query.set_transaction_ID(_transaction_ID ++);
+    query.set_transaction_ID(++ _transaction_ID);
     query.set_query_name(c_domain_name);
-    query.serialize_to_data(query_data);
+    query.serialize_to_data(query_data, network_type());
+
+    DEBUG("Netowrk type: %u", network_type());
 
     DEBUG("Get request data: %s", dump_data_to_string(query_data).c_str());
 
@@ -231,10 +265,17 @@ struct Error DNSItnlClient::_send_dns_request_for(const char *c_domain_name, con
 }
 
 
-struct Error DNSItnlClient::_recv_dns_reply(uint8_t *data_buff, size_t buff_len, size_t *recv_len_out, const struct timeval *timeout)
+void DNSItnlClient::_parse_dns_response(const uint8_t *data_buff, size_t data_len)
 {
-    _status = _udp_client->recv_in_timeval(data_buff, buff_len, recv_len_out, *timeout);
-    return _status;
+    DNSResult *result = new DNSResult;
+    if (result->parse_from_udp_payload(data_buff, data_len)) {
+        _dns_result[result->domain_name()] = result;
+    }
+    else {
+        delete result;
+        result = NULL;
+    }
+    return;
 }
 
 
@@ -258,6 +299,13 @@ NetType_t DNSItnlClient::network_type()
 struct Error DNSItnlClient::resolve(const std::string &domain_name, double timeout_seconds, const std::string &dns_server_ip)
 {
     struct timeval timeout = to_timeval(timeout_seconds);
+    return resolve_in_timeval(domain_name, timeout, dns_server_ip);
+}
+
+
+struct Error DNSItnlClient::resolve_in_milisecs(const std::string &domain_name, unsigned timeout_milisecs, const std::string &dns_server_ip)
+{
+    struct timeval timeout = to_timeval_from_milisecs(timeout_milisecs);
     return resolve_in_timeval(domain_name, timeout, dns_server_ip);
 }
 
@@ -324,7 +372,7 @@ struct Error DNSItnlClient::resolve_in_timeval(const std::string &domain_name, c
     }
 
     // send DNS request
-    _send_dns_request_for(dns_ip.c_str(), (struct sockaddr *)(&addr), addr_len);
+    _send_dns_request_for(domain_name.c_str(), (struct sockaddr *)(&addr), addr_len);
     if (FALSE == _status.is_ok()) {
         return _status;
     }
@@ -353,20 +401,46 @@ struct Error DNSItnlClient::resolve_in_timeval(const std::string &domain_name, c
         remain_time.tv_usec = timeout_orig.tv_usec;
     }
 
-    // recv
+    // recv()
     do {
         recv_size = 0;
-        _recv_dns_reply(data_buff, sizeof(data_buff), &recv_size, &remain_time);
+        _status = _udp_client->recv_in_timeval(data_buff, sizeof(data_buff), &recv_size, remain_time);
 
+        // check recv status
         if (FALSE == _status.is_ok()) {
             should_continue_recv = FALSE;
         }
+        else if (0 == recv_size) {
+            DEBUG("No data to go");
+            should_continue_recv = TRUE;
+        }
         else {
-            // TODO: resolve DNS data
+            DEBUG("Get DNS reply: %s", ::andrewmc::cpptools::dump_data_to_string(data_buff, recv_size).c_str());
+            _parse_dns_response(data_buff, recv_size);
+
+            if (dns_result(domain_name)) {
+                // OK, searched
+                should_continue_recv = FALSE;
+            }
         }   // end of if (FALSE == _status.is_ok())
 
-    }
-    while (should_continue_recv);
+        // check timeout and continue recv
+        if (should_continue_recv)
+        {
+            if (FALSE == should_recv_forever)
+            {
+                now_time = ::andrewmc::cpptools::sys_up_timeval();
+                if (timercmp(&now_time, &end_time, <)) {
+                    // should continue waiting
+                    timersub(&end_time, &now_time, &remain_time);
+                }
+                else {
+                    _status.set_app_errno(ERR_TIMEOUT);
+                    should_continue_recv = FALSE;
+                }
+            }
+        }
+    } while (should_continue_recv);
 
     // return
     return _status;
@@ -411,6 +485,7 @@ std::string DNSItnlClient::default_dns_server(size_t index, NetType_t *network_t
         int call_stat = stat(_DNS_FILE_PATH, &dns_file_stat);
         if (call_stat < 0) {
             ERROR("Failed to read DNS file stat: %s", strerror(errno));
+            should_update_DNS = TRUE;
         }
         else {
             if (dns_file_stat.st_mtim.tv_sec != g_DNS_file_modifed_time.tv_sec
@@ -425,9 +500,21 @@ std::string DNSItnlClient::default_dns_server(size_t index, NetType_t *network_t
     // update default DNS config
     if (should_update_DNS)
     {
-        FILE *dns_file = fopen(_DNS_FILE_PATH, "f");
-        if (NULL == dns_file) {
+        FILE *dns_file = fopen(_DNS_FILE_PATH, "r");
+        if (NULL == dns_file)
+        {
             ERROR("Failed to open DNS file: %s", strerror(errno));
+
+            switch (network_type())
+            {
+                default:
+                case NetIPv4:
+                    return std::string("8.8.8.8");
+                    break;
+                case NetIPv6:
+                    return std::string("2001:4860:4860::8888");
+                    break;
+            }
         }
         else {
             char line_buff[516];
@@ -437,7 +524,8 @@ std::string DNSItnlClient::default_dns_server(size_t index, NetType_t *network_t
 
             while (fgets(line_buff, sizeof(line_buff), dns_file) != NULL)
             {
-                const char *name_srv_leading = "nameserver";
+                const char name_srv_leading[] = "nameserver";
+                size_t line_len = strlen(line_buff);
                 size_t ip_start = 0;
                 BOOL is_ip_start_found = FALSE;
                 NetType_t network_type = NetUnknown;
@@ -447,17 +535,25 @@ std::string DNSItnlClient::default_dns_server(size_t index, NetType_t *network_t
                     continue;
                 }
 
+                // remove return char
+                while((line_len > 0) && 
+                    ('\n' == line_buff[line_len - 1] || '\r' == line_buff[line_len - 1]))
+                {
+                    line_buff[line_len - 1] = '\0';
+                    line_len -= 1;
+                }
+
                 // check network type
-                if (NULL == strstr(line_buff, ":")) {
+                ip_start += sizeof(name_srv_leading);
+                if (strstr(line_buff + ip_start, ":")) {
                     network_type = NetIPv6;
                 } else {
                     network_type = NetIPv4;
                 }
 
                 // find DNS IP configuration
-                ip_start += sizeof(name_srv_leading);
                 do {
-                    switch(name_srv_leading[ip_start])
+                    switch(line_buff[ip_start])
                     {
                         case ':':
                         case '0':
@@ -493,7 +589,7 @@ std::string DNSItnlClient::default_dns_server(size_t index, NetType_t *network_t
 
                 // resolve
                 std::string ip = std::string(line_buff + ip_start);
-                DEBUG("DNS - %u: %s", g_DNS_IPs.size(), ip.c_str());
+                //DEBUG("DNS - %u: %s", g_DNS_IPs.size(), ip.c_str());
                 g_DNS_IPs.push_back(ip);
                 g_DNS_network_type.push_back(network_type);
 
@@ -516,7 +612,16 @@ std::string DNSItnlClient::default_dns_server(size_t index, NetType_t *network_t
         if (network_type_out) {
             *network_type_out = NetUnknown;
         }
-        return "";
+        switch (network_type())
+        {
+            default:
+            case NetIPv4:
+                return std::string("8.8.8.8");
+                break;
+            case NetIPv6:
+                return std::string("2001:4860:4860::8888");
+                break;
+        }
     }
 }
 
