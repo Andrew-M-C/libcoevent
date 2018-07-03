@@ -32,6 +32,8 @@ const char *g_error_msg_list[] = {
     "object is not initialized",
     "object not found",
 
+    "cannot find approperate DNS server IP",
+
     "unknown error"     // should place at last
 };
 

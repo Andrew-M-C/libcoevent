@@ -42,6 +42,8 @@ typedef enum {
     ERR_NOT_INITIALIZED,
     ERR_OBJ_NOT_FOUND,
 
+    ERR_DNS_SERVER_IP_NOT_FOUND,
+
     ERR_UNKNOWN     // should place at last
 } ErrCode_t;
 

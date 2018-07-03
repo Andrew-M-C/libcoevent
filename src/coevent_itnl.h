@@ -5,12 +5,14 @@
 
 #include "co_routine_inner.h"
 #include "co_routine.h"
+#include "cpp_tools.h"
 #include "coevent.h"
 #include <sys/time.h>
 #include <sys/types.h>
 #include <sys/socket.h>
 #include <netinet/in.h>
 #include <sys/un.h>
+#include <stdint.h>
 
 namespace andrewmc {
 namespace libcoevent {
@@ -23,13 +25,14 @@ namespace libcoevent {
 ssize_t print(int fd, const char *format, ...);
 
 #if DEBUG_FLAG
-#define DEBUG(fmt, args...)   print(1, "%s, %s(), %d: "fmt, __FILE__, __func__, __LINE__, ##args)
+#define DEBUG(fmt, args...)   print(1, "DEBUG - %s, %s(), %d: "fmt, __FILE__, __func__, __LINE__, ##args)
+#define INFO(fmt, args...)    print(1, "INFO  - %s, %s(), %d: "fmt, __FILE__, __func__, __LINE__, ##args)
+#define ERROR(fmt, args...)   print(2, "ERROR - %s, %s(), %d: "fmt, __FILE__, __func__, __LINE__, ##args)
 #else
 #define DEBUG(fmt, args...)
+#define INFO(fmt, args...)    print(1, fmt, ##args)
+#define ERROR(fmt, args...)   print(2, fmt, ##args)
 #endif
-
-#define INFO(fmt, args...)    print(1, "%s", fmt, ##args)
-#define ERROR(fmt, args...)   print(1, "%s", fmt, ##args)
 
 // to_timeval()
 struct timeval to_timeval(double seconds);
@@ -59,6 +62,10 @@ BOOL event_readable(uint32_t libevent_what);
 void convert_str_to_sockaddr_in(const std::string &str, unsigned port, struct sockaddr_in *addr_out);
 void convert_str_to_sockaddr_in6(const std::string &str, unsigned port, struct sockaddr_in6 *addr_out);
 void convert_str_to_sockaddr_un(const std::string &str, struct sockaddr_un *addr_out);
+
+// sockaddr to string
+std::string str_from_sin_addr(const struct in_addr *addr);
+std::string str_from_sin6_addr(const struct in6_addr *addr6);
 
 // Actual implementation of UDPClient
 class UDPItnlClient : public UDPClient
@@ -92,6 +99,8 @@ public:
     struct Error recv_in_timeval(void *data_out, const size_t len_limit, size_t *len_out_nullable, const struct timeval &timeout);
     struct Error recv_in_mimlisecs(void *data_out, const size_t len_limit, size_t *len_out_nullable, unsigned timeout_milisecs);
 
+    std::string default_dns_server(size_t index = 0);
+
     std::string remote_addr();    // valid in IPv4 or IPv6 type
     unsigned remote_port();       // valid in IPv4 or IPv6 type
     void copy_remote_addr(struct sockaddr *addr_out, socklen_t addr_len);
@@ -103,6 +112,44 @@ private:
     void _clear();
 
     struct sockaddr *_remote_addr();
+};
+
+
+// Actual implementation of DNSClient
+class DNSItnlClient : public DNSClient {
+protected:
+    std::map<std::string, DNSResult *>  _dns_result;
+    UDPItnlClient                       *_udp_client;
+    static uint16_t                     _transaction_ID;
+
+public:
+    // construct and descruct functions
+    DNSItnlClient();
+    virtual ~DNSItnlClient();
+    struct Error init(Server *server, struct stCoRoutine_t *coroutine, NetType_t network_type, void *user_arg = NULL);
+
+    // send and receive DNS request
+    NetType_t network_type();
+    struct Error resolve(const std::string &domain_name, double timeout_seconds = 0, const std::string &dns_server_ip = "");
+    struct Error resolve_in_timeval(const std::string &domain_name, const struct timeval &timeout, const std::string &dns_server_ip = "");
+    struct Error resolve_in_milisecs(const std::string &domain_name, unsigned timeout_milisecs, const std::string &dns_server_ip = "");
+
+    // read default DNS server configured in syste
+    std::string default_dns_server(size_t index = 0, NetType_t *network_type_out = NULL);
+
+    // misc functions
+    const DNSResult *dns_result(const std::string &domain_name);
+    Server *owner_server();
+
+    // remote addr
+    std::string remote_addr();    // valid in IPv4 or IPv6 type
+    unsigned remote_port();       // valid in IPv4 or IPv6 type
+    void copy_remote_addr(struct sockaddr *addr_out, socklen_t addr_len);
+
+private:
+    void _init();
+    struct Error _send_dns_request_for(const char *c_domain_name, const struct sockaddr *addr, socklen_t addr_len);
+    void _parse_dns_response(const uint8_t *c_data, size_t data_len);
 };
 
 }   // end of namespace libcoevent
