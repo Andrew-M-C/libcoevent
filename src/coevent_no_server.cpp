@@ -163,7 +163,7 @@ struct Error NoServer::init(Base *base, WorkerFunc func, void *user_arg, BOOL au
     struct _EventArg *arg = new _EventArg;
     _event_arg = (void *)arg;
     arg->event = this;
-    arg->user_arg = arg;
+    arg->user_arg = user_arg;
     arg->worker_func = func;
 
     // create arg for libco

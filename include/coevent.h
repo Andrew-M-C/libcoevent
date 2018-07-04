@@ -300,8 +300,11 @@ public:
     virtual ~DNSResult();
     const std::string &domain_name() const;
     std::vector<std::string> IP_addresses();
-    time_t time_to_live();
+    time_t time_to_live() const;
     BOOL parse_from_udp_payload(const void *data, const size_t length);
+
+    size_t resource_record_count() const;
+    const DNSResourceRecord *resource_record(size_t index) const;
 };
 
 

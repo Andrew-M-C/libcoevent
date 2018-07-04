@@ -175,6 +175,7 @@ struct Error UDPServer::init(Base *base, WorkerFunc func, const struct sockaddr 
     arg->worker_func = func;
     arg->libevent_what_ptr = _libevent_what_storage;
     DEBUG("arg->libevent_what_ptr = %p", arg->libevent_what_ptr);
+    DEBUG("User arg: %08p", user_arg);
 
     // create arg for libco
     int call_ret = co_create(&(arg->coroutine), NULL, _libco_routine, arg);

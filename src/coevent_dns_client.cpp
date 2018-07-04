@@ -204,11 +204,13 @@ const DNSResult *DNSItnlClient::dns_result(const std::string &domain_name)
 {
     std::map<std::string, DNSResult *>::iterator dns_item = _dns_result.find(domain_name);
     if (dns_item == _dns_result.end()) {
+        DEBUG("DNS recode for %s not found", domain_name.c_str());
         return NULL;
     }
 
     // check if the object is valid
     if (0 == dns_item->second->time_to_live())  {
+        DEBUG("DNS record for %s timeout", domain_name.c_str());
         _dns_result.erase(dns_item);
         return NULL;
     }
@@ -269,6 +271,7 @@ void DNSItnlClient::_parse_dns_response(const uint8_t *data_buff, size_t data_le
 {
     DNSResult *result = new DNSResult;
     if (result->parse_from_udp_payload(data_buff, data_len)) {
+        DEBUG("%s DNS record found", result->domain_name().c_str());
         _dns_result[result->domain_name()] = result;
     }
     else {
@@ -420,7 +423,11 @@ struct Error DNSItnlClient::resolve_in_timeval(const std::string &domain_name, c
 
             if (dns_result(domain_name)) {
                 // OK, searched
+                DEBUG("DNS resuest found");
                 should_continue_recv = FALSE;
+            }
+            else {
+                DEBUG("Not the DNS request we are loking for");
             }
         }   // end of if (FALSE == _status.is_ok())
 

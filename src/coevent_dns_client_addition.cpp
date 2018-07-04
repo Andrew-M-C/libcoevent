@@ -220,7 +220,7 @@ std::vector<std::string> DNSResult::IP_addresses()
 }
 
 
-time_t DNSResult::time_to_live()
+time_t DNSResult::time_to_live() const
 {
     time_t sysup_time = ::andrewmc::cpptools::sys_up_time();
     time_t expire_time = _update_time + _update_ttl;
@@ -299,11 +299,29 @@ BOOL DNSResult::parse_from_udp_payload(const void *bytes, const size_t length)
         DEBUG("Got record: %s -- %s (TTL: %u)", an_RR->record_name().c_str(), an_RR->record_address().c_str(), (unsigned)an_RR->record_ttl());
     }
 
+    // set TTL
+    _update_time = ::andrewmc::cpptools::sys_up_time();
+
     // check TTL
     DEBUG("TTL: %u", (unsigned)_update_ttl);
-
-    // TODO:
     return TRUE;
+}
+
+
+
+size_t DNSResult::resource_record_count() const
+{
+    return _rr_list.size();
+}
+
+
+const DNSResourceRecord *DNSResult::resource_record(size_t index) const
+{
+    if (index < _rr_list.size()) {
+        return _rr_list[index];
+    } else {
+        return NULL;
+    }
 }
 
 

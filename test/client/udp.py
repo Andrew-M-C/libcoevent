@@ -12,10 +12,11 @@ def main():
     log.debug('Hello libcoevent UDP!')
     sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
 
-    msg = 'Hello, libcoevent from python UDP'
+    msg = 'www.google.com'
     if len(sys.argv) > 1:
         msg = str(sys.argv[1])
 
+    log.debug('parameter: %s' % msg)
     sock.sendto(msg.encode(), 0, ('127.0.0.1', 2333))
     log.debug('Data sent')
 
