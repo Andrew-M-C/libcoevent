@@ -257,12 +257,6 @@ struct Error UDPServer::init(Base *base, WorkerFunc func, const struct sockaddr 
 }
 
 
-struct Error UDPServer::init(Base *base, WorkerFunc func, const struct sockaddr &addr, socklen_t addr_len, void *user_arg, BOOL auto_free)
-{
-    return init(base, func, &addr, addr_len, user_arg, auto_free);
-}
-
-
 struct Error UDPServer::init(Base *base, WorkerFunc func, NetType_t network_type, int bind_port, void *user_arg, BOOL auto_free)
 {
     if (NetIPv4 == network_type)
