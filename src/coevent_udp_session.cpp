@@ -301,8 +301,8 @@ struct Error UDPItnlSession::init(Base *base, int server_fd, WorkerFunc func, co
 
 
 // ==========
-#define __PUBLIC_MISC_FUNCTIONS
-#ifdef __PUBLIC_MISC_FUNCTIONS
+#define __MISC_FUNCTIONS
+#ifdef __MISC_FUNCTIONS
 
 NetType_t UDPItnlSession::network_type()
 {
@@ -331,7 +331,19 @@ int UDPItnlSession::port() const
 }
 
 
-#endif  // end of __PUBLIC_MISC_FUNCTIONS
+struct stCoRoutine_t *UDPItnlSession::_coroutine()
+{
+    if (_event_arg) {
+        struct _EventArg *arg = (struct _EventArg *)_event_arg;
+        return arg->coroutine;
+    }
+    else {
+        return NULL;
+    }
+}
+
+
+#endif  // end of __MISC_FUNCTIONS
 
 
 // ==========

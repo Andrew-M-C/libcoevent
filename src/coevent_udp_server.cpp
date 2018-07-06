@@ -8,6 +8,7 @@
 #include <unistd.h>
 #include <arpa/inet.h>
 #include <stdlib.h>
+#include <map>
 
 using namespace andrewmc::libcoevent;
 
@@ -26,6 +27,11 @@ struct _EventArg {
     struct stCoRoutine_t *coroutine;
     WorkerFunc          worker_func;
     void                *user_arg;
+
+    WorkerFunc          session_worker_func;
+    void                *session_user_arg;
+
+    std::map<std::string, UDPItnlSession *> session_collection;
 
     _EventArg(): event(NULL), fd(0), libevent_what_ptr(NULL), coroutine(NULL)
     {}
@@ -76,6 +82,81 @@ static void _libevent_callback(evutil_socket_t fd, short what, void *libevent_ar
     }
 
     // done
+    return;
+}
+
+#endif
+
+
+// ==========
+#define __SESSION_MODE_WORKER_FUNC
+#ifdef __SESSION_MODE_WORKER_FUNC
+
+static void _session_mode_worker(evutil_socket_t fd, Event *abs_server, void *libcoevent_arg)
+{
+    struct _EventArg *arg = (struct _EventArg *)libcoevent_arg;
+    void *user_arg = arg->session_user_arg;
+    WorkerFunc worker_func = arg->session_worker_func;
+    UDPServer *server = (UDPServer *)abs_server;
+    std::map<std::string, UDPItnlSession *> &session_collection = arg->session_collection;
+
+    uint8_t data_buff[4096];
+    size_t recv_len = 0;
+    Error status;
+    BOOL should_exit_udp = FALSE;
+
+    socklen_t sock_len = 0;
+    switch(server->network_type())
+    {
+        default:
+        case NetIPv4:
+            sock_len = sizeof(struct sockaddr_in);
+            break;
+        case NetIPv6:
+            sock_len = sizeof(struct sockaddr_in6);
+            break;
+    }
+
+    // receive data
+    do {
+        recv_len = 0;
+        status = server->recv((void *)data_buff, sizeof(data_buff), &recv_len);
+        if (status.is_ok())
+        {
+            std::string remote_ip = server->client_addr();
+            unsigned remote_port = server->client_port();
+
+            char remote_key_buff[128];
+            snprintf(remote_key_buff, sizeof(remote_key_buff), "%s:%u", remote_ip.c_str(), remote_port);
+
+            std::string remote_key = std::string(remote_key_buff);
+
+            std::map<std::string, UDPItnlSession *>::iterator session_iter = session_collection.find(remote_key);
+            if (session_collection.end() != session_iter) {
+                session_iter->second->forward_incoming_data(data_buff, recv_len);
+            }
+            else {
+                // we should create a session
+                struct sockaddr_storage sock_addr;
+                server->copy_client_addr((struct sockaddr *)&sock_addr, sock_len);
+
+                UDPItnlSession *session = new UDPItnlSession;
+                status = session->init(server->owner(), fd, worker_func, (struct sockaddr *)&sock_addr, sock_len, user_arg);
+                if (FALSE == status.is_ok()) {
+                    delete session;
+                    ERROR("Failed to create UDP session: %s", status.c_err_msg());
+                }
+                else {
+                    DEBUG("Create session for %s", remote_key.c_str());
+                    session->forward_incoming_data(data_buff, recv_len);
+                    session_collection[remote_key] = session;
+                }
+            }
+        }
+
+    } while (FALSE == should_exit_udp);
+
+    // exit UDP server
     return;
 }
 
@@ -362,6 +443,15 @@ void UDPServer::_clear()
             arg->coroutine = NULL;
         }
 
+        for (std::map<std::string, UDPItnlSession *>::iterator each_session = (arg->session_collection).begin();
+            each_session != arg->session_collection.end();
+            each_session ++)
+        {
+            DEBUG("delete session %s", each_session->second->identifier().c_str());
+            delete each_session->second;
+        }
+        arg->session_collection.clear();
+
         DEBUG("Delete _event_arg");
         delete arg;
     }
@@ -405,6 +495,63 @@ UDPServer::~UDPServer()
 }
 
 #endif  // end of __PUBLIC_INIT_AND_CLEAR_FUNCTIONS
+
+
+// ==========
+#define __INIT_SESSION_MODE
+#ifdef __INIT_SESSION_MODE
+
+struct Error UDPServer::init_session_mode(Base *base, WorkerFunc session_func, const struct sockaddr *addr, socklen_t addr_len, void *user_arg, BOOL auto_free)
+{
+    if (!(base && addr && addr_len && session_func)) {
+        _status.set_app_errno(ERR_PARA_NULL);
+        return _status;
+    }
+
+    if (addr->sa_family != AF_INET
+        && addr->sa_family != AF_INET6)
+    {
+        _status.set_app_errno(ERR_NETWORK_TYPE_ILLEGAL);
+        return _status;
+    }
+
+    init(base, _session_mode_worker, addr, addr_len, user_arg, auto_free);
+    if (_status.is_ok()) {
+        struct _EventArg *arg = (struct _EventArg *)_event_arg;
+        arg->user_arg = arg;        // expose struct _EventArg to _session_mode_worker()
+        arg->session_worker_func = session_func;
+        arg->session_user_arg = user_arg;
+    }
+
+    return _status;
+}
+
+
+struct Error UDPServer::init_session_mode(Base *base, WorkerFunc session_func, NetType_t network_type, int bind_port, void *user_arg, BOOL auto_free)
+{
+    if (!(base && bind_port && session_func)) {
+        _status.set_app_errno(ERR_PARA_NULL);
+        return _status;
+    }
+
+    if (NetLocal == network_type) {
+        _status.set_app_errno(ERR_NETWORK_TYPE_ILLEGAL);
+        return _status;
+    }
+
+    init(base, _session_mode_worker, network_type, bind_port, user_arg, auto_free);
+    if (_status.is_ok()) {
+        struct _EventArg *arg = (struct _EventArg *)_event_arg;
+        arg->user_arg = arg;
+        arg->session_worker_func = session_func;
+        arg->session_user_arg = user_arg;
+    }
+
+    return _status;
+}
+
+
+#endif  // end of __INIT_SESSION_MODE
 
 
 // ==========

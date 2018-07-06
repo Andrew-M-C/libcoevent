@@ -199,8 +199,6 @@ public:
     // session mode does not support AF_UNIX
     struct Error init_session_mode(Base *base, WorkerFunc session_func, const struct sockaddr *addr, socklen_t addr_len, void *user_arg = NULL, BOOL auto_free = TRUE);
     struct Error init_session_mode(Base *base, WorkerFunc session_func, NetType_t network_type, int bind_port = 0, void *user_arg = NULL, BOOL auto_free = TRUE);
-    struct Error init_session_mode(Base *base, WorkerFunc session_func, const char *bind_path, void *user_arg = NULL, BOOL auto_free = TRUE);
-    struct Error init_session_mode(Base *base, WorkerFunc session_func, std::string &bind_path, void *user_arg = NULL, BOOL auto_free = TRUE);
     struct Error quit_session_mode_server();
 
     NetType_t network_type();

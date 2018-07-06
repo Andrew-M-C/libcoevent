@@ -196,6 +196,9 @@ public:
 
 public:
     int port() const;
+
+protected:
+    struct stCoRoutine_t *_coroutine();
 };
 
 }   // end of namespace libcoevent

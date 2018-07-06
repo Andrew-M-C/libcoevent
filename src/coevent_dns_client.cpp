@@ -158,6 +158,14 @@ DNSItnlClient::DNSItnlClient()
 
 DNSItnlClient::~DNSItnlClient()
 {
+    for (std::map<std::string, DNSResult *>::iterator each_result = _dns_result.begin();
+        each_result != _dns_result.end();
+        each_result ++)
+    {
+        delete each_result->second;
+    }
+    _dns_result.clear();
+
     if (_udp_client)
     {
         delete _udp_client;
