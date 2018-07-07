@@ -189,7 +189,7 @@ protected:
 
 public:
     UDPServer();
-    ~UDPServer();
+    virtual ~UDPServer();
 
     struct Error init(Base *base, WorkerFunc func, const struct sockaddr *addr, socklen_t addr_len, void *user_arg = NULL, BOOL auto_free = TRUE);
     struct Error init(Base *base, WorkerFunc func, NetType_t network_type, int bind_port = 0, void *user_arg = NULL, BOOL auto_free = TRUE);

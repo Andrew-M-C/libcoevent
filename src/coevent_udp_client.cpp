@@ -373,6 +373,7 @@ struct Error UDPItnlClient::init(Server *server, struct stCoRoutine_t *coroutine
     // create event
     _owner_server = server;
     _owner_base = server->owner();
+    _owner_base->put_event_under_control(this);
     _event = event_new(_owner_base->event_base(), fd, EV_TIMEOUT | EV_READ, _libevent_callback, arg);
     if (NULL == _event) {
         ERROR("Failed to new a UDP event");

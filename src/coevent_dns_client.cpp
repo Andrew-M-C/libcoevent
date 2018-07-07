@@ -158,6 +158,8 @@ DNSItnlClient::DNSItnlClient()
 
 DNSItnlClient::~DNSItnlClient()
 {
+    DEBUG("Now delete DNS client %p", this);
+
     for (std::map<std::string, DNSResult *>::iterator each_result = _dns_result.begin();
         each_result != _dns_result.end();
         each_result ++)
@@ -168,6 +170,7 @@ DNSItnlClient::~DNSItnlClient()
 
     if (_udp_client)
     {
+        DEBUG("Now delete UDP client %p", _udp_client);
         delete _udp_client;
         _udp_client = NULL;
     }
@@ -196,6 +199,7 @@ struct Error DNSItnlClient::init(Server *server, struct stCoRoutine_t *coroutine
 
     _init();
     _udp_client = new UDPItnlClient;
+    server->owner()->put_event_under_control(this);
     _status = _udp_client->init(server, coroutine, network_type, user_arg);
     return _status;
 }
