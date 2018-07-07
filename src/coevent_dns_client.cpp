@@ -328,19 +328,22 @@ struct Error DNSItnlClient::resolve_in_timeval(const std::string &domain_name, c
     // get default DNS ip address
     if (0 == dns_ip.length())
     {
-        // read forst default DNS server
-        std::vector<std::string>::iterator each_ip = g_DNS_IPs.begin();
-        std::vector<NetType_t>::iterator each_type = g_DNS_network_type.begin();
+        if (0 == g_DNS_IPs.size()) {
+            // read DNS conf once.
+            dns_ip = default_dns_server(0, NULL);
+        }
 
-        do {
-            if (network_type() == *each_type) {
-                dns_ip.assign(*each_ip);
+        for (unsigned index = 0; index < g_DNS_IPs.size(); index ++)
+        {
+            NetType_t type = NetUnknown;
+            dns_ip = default_dns_server(index, &type);
+
+            DEBUG("%u - %s", (unsigned)type, dns_ip.c_str());
+
+            if (network_type() == type) {
                 break;
             }
-            each_ip ++;
-            each_type ++;
         }
-        while(each_ip != g_DNS_IPs.end());
         
         // failed to read default DNS
         if (0 == dns_ip.length()) {

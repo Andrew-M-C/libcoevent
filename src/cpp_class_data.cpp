@@ -10,7 +10,6 @@
 using namespace andrewmc::cpptools;
 
 #define _DEFAULT_CAPACITY       (4*1024)        // 0x1000
-#define _SIZE_DECREASING_THRESHOLD      (4*1024)
 #define _COEFFICIENT_THRESHOLD  (10)
 
 #define _DB(fmt, args...)   printf("%s, %s(), %d: "fmt"\n", __FILE__, __func__, __LINE__, ##args)
@@ -33,8 +32,12 @@ size_t Data::_appropriate_buff_size(size_t length)
         length = _data_len;
     }
 
-    if (length <= _SIZE_DECREASING_THRESHOLD) {
-        return _SIZE_DECREASING_THRESHOLD;
+    if (length <= _DEFAULT_CAPACITY) {
+        return _DEFAULT_CAPACITY;
+    }
+
+    if (length <= _ensured_buff_size) {
+        return _ensured_buff_size;
     }
     size_t n = 1;
 
@@ -156,6 +159,7 @@ Data::Data()
     _data_len = 0;
     _buff_size = 0;
     _coefficient = 0;
+    _ensured_buff_size = _DEFAULT_CAPACITY;
 
     _data_buff = malloc(_DEFAULT_CAPACITY);
     if (NULL == _data_buff) {
@@ -174,6 +178,7 @@ Data::Data(const void *c_data, size_t length)
     _buff_size = 0;
     _coefficient = 0;
     _data_buff = NULL;
+    _ensured_buff_size = _DEFAULT_CAPACITY;
 
     if (NULL == c_data)
     {
@@ -207,6 +212,7 @@ Data::Data(const Data &data_to_copy)
     _buff_size = 0;
     _coefficient = 0;
     _data_buff = NULL;
+    _ensured_buff_size = _DEFAULT_CAPACITY;
 
     if (NULL == c_data)
     {
@@ -254,7 +260,7 @@ Data::~Data()
 void Data::clear()
 {
     _data_len = 0;
-    if (_buff_size > _SIZE_DECREASING_THRESHOLD) {
+    if (_buff_size > _ensured_buff_size) {
         _check_coefficient();
     }
     return;
@@ -441,5 +447,80 @@ void Data::append(const void *c_data, size_t length)
 }
 
 
+void Data::append_nul()
+{
+    if (_data_len < _buff_size) {
+        ((uint8_t *)_data_buff)[_data_len ++] = '\0';
+    }
+    else {
+        const uint8_t NUL_BYTE = (uint8_t)0;
+        append((void *)(&NUL_BYTE), sizeof(NUL_BYTE));
+    }
+    return;
+}
+
+
 #endif  // end of __MODIFYING
+
+
+// ==========
+#define __RAW_ACCESS
+#ifdef __RAW_ACCESS
+
+void Data::ensure_buff_capacity(size_t capacity)
+{
+    size_t expected_capacity = _appropriate_buff_size(capacity);
+
+    // maybe need no resizing and no assignment
+    if (expected_capacity < _ensured_buff_size) {
+        _ensured_buff_size = expected_capacity;
+        return;
+    }
+
+    // maybe no resizing needed but _ensure_xxx value should be updated
+    if (expected_capacity <= _buff_size) {
+        _ensured_buff_size = expected_capacity;
+        return;
+    }
+
+    // should resize
+    // expected_capacity > _buff_size
+    BOOL realloc_ok = _resize(expected_capacity);
+    if (FALSE == realloc_ok) {
+        throw std::bad_alloc();
+        return;
+    }
+    else {
+        _ensured_buff_size = expected_capacity;
+        return;
+    }
+}
+
+
+size_t Data::buff_capacity()
+{
+    return _buff_size;
+}
+
+
+void *Data::mutable_raw_data()
+{
+    return _data_buff;
+}
+
+
+void Data::set_raw_data_length(size_t length)
+{
+    if (length <= _buff_size) {
+        _data_len = length;
+        _check_coefficient();
+    }
+    else {
+        expand(length);
+    }
+    return;
+}
+
+
+#endif  // end of __RAW_ACCESS
 

@@ -42,6 +42,7 @@ protected:
     void        *_data_buff;
     size_t      _data_len;
     size_t      _buff_size;
+    size_t      _ensured_buff_size;
     unsigned    _coefficient;
 public:
     // initialization
@@ -67,6 +68,13 @@ public:
     void replace(size_t index, const void *c_data, size_t length);
     void append(const Data &data);
     void append(const void *c_data, size_t length);
+    void append_nul(void);
+
+    // raw access
+    void ensure_buff_capacity(size_t capacity);
+    size_t buff_capacity(void);
+    void *mutable_raw_data(void);
+    void set_raw_data_length(size_t length);
 
 protected:
     size_t _appropriate_buff_size(size_t length = 0);

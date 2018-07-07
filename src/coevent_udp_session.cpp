@@ -143,7 +143,7 @@ void UDPItnlSession::_clear()
         }
 
         DEBUG("Delete _event_arg");
-        delete arg;
+        free(arg);
     }
 
     if (_fd > 0) {
@@ -161,6 +161,7 @@ struct Error UDPItnlSession::init(Base *base, int server_fd, WorkerFunc func, co
     const BOOL auto_free = TRUE;
 
     if (!(base && remote_addr && server_fd > 0)) {
+        DEBUG("%p, %p, %u", base, remote_addr, (unsigned)server_fd);
         _status.set_app_errno(ERR_PARA_NULL);
         return _status;
     }
@@ -176,7 +177,12 @@ struct Error UDPItnlSession::init(Base *base, int server_fd, WorkerFunc func, co
     _server_fd = server_fd;
 
     // create arguments
-    struct _EventArg *arg = new _EventArg;
+    struct _EventArg *arg = (struct _EventArg *)malloc(sizeof(*arg));
+    if (NULL == arg) {
+        throw std::bad_alloc();
+        _status.set_sys_errno();
+        return _status;
+    }
     _event_arg = arg;
     arg->event = this;
     arg->user_arg = user_arg;
@@ -186,6 +192,14 @@ struct Error UDPItnlSession::init(Base *base, int server_fd, WorkerFunc func, co
     DEBUG("User arg: %08p", user_arg);
 
     // create arg for libco
+    DEBUG("Now test malloc");
+    {
+        void * temp_buff = malloc(64);
+        if (temp_buff) {
+            free(temp_buff);
+            DEBUG("Test OK");
+        }
+    }
     int call_ret = co_create(&(arg->coroutine), NULL, _libco_routine, arg);
     if (call_ret != 0) {
         _clear();
@@ -271,6 +285,7 @@ struct Error UDPItnlSession::init(Base *base, int server_fd, WorkerFunc func, co
 
     // non-block
     set_fd_nonblock(_fd);
+    arg->fd = _fd;
 
     // create event
     _owner_base = base;

@@ -312,6 +312,7 @@ struct Error UDPServer::init(Base *base, WorkerFunc func, const struct sockaddr 
 
     // non-block
     set_fd_nonblock(fd);
+    arg->fd = fd;
 
     // create event
     _owner_base = base;

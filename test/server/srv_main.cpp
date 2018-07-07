@@ -13,7 +13,6 @@ using namespace andrewmc::libcoevent;
 using namespace andrewmc::cpptools;
 
 #define _UDP_PORT       (2333)
-#define _UDP_PORT_2     (6666)
 
 #define LOG(fmt, args...)   _print("SERVER: %s, %s, %d: "fmt, __FILE__, __func__, __LINE__, ##args)
 static ssize_t _print(const char *format, ...)
@@ -48,156 +47,72 @@ static ssize_t _print(const char *format, ...)
     return (write(1, buff, dateLen + 1));
 }
 
-static void _sub_udp_routine(evutil_socket_t fd, Event *abs_server, void *arg);
-
-
-// ==========
-#define __CHILD_CLASS_OF_NO_SERVER
-#ifdef __CHILD_CLASS_OF_NO_SERVER
-
-class DNSServer : public NoServer {
-protected:
-    struct sockaddr_in  _client_addr;
-    std::string         _server_name;
-public:
-    struct sockaddr_in &client_addr() {
-        return _client_addr;
-    }
-    std::string &server_name() {
-        return _server_name;
-    }
-};
-
-
-#endif
-
-// ==========
-#define __SUB_SESSION
-#ifdef __SUB_SESSION
-
-
-
-#endif
-
 
 // ==========
 #define __UDP_SERVER
 #ifdef __UDP_SERVER
 
-static void _main_server_routine(evutil_socket_t fd, Event *abs_server, void *arg)
+
+static void _udp_session_routine(evutil_socket_t fd, Event *abs_server, void *arg)
 {
-    UDPServer *server = (UDPServer *)abs_server;
-    Base *base = (Base *)arg;
-    const size_t BUFF_LEN = 2048;
+    UDPSession *session = (UDPSession *)abs_server;
     struct Error status;
-    size_t read_len = 0;
-    uint8_t data_buff[BUFF_LEN + 1];
-    data_buff[BUFF_LEN] = (uint8_t)0;
-    BOOL should_quit = FALSE;
 
-    //LOG("Start server, binded at Port %d", server->port());
-    //LOG("Now sleep(1.5)");
-    //server->sleep(1.5);
-    
-    LOG("Now recv");
-    do {
-        should_quit = FALSE;
-        status = server->recv(data_buff, BUFF_LEN, &read_len, 0);
-        if (status.is_timeout()) {
-            LOG("Timeout, wait again");
-        }
-        else if (status.is_error()) {
-            LOG("server error: %s", status.c_err_msg());
-            should_quit = TRUE;
-        }
-        else {
-            data_buff[read_len] = '\0';
-            LOG("Got message from '%s:%u', length %u, msg: '%s'", server->client_addr().c_str(), server->client_port(), (unsigned)read_len, (char*)data_buff);
+    ::andrewmc::cpptools::Data data_buff;
+    size_t recv_len = 0;
 
-            std::string msg_str = dump_data_to_string(data_buff, read_len);
-            //LOG("Data detail:\n%s", msg_str.c_str());
-
-            if (0 == strcmp((char *)data_buff, "quit")) {
-                should_quit = TRUE;
-            }
-            else {
-                DNSServer *sub_server = new DNSServer;
-
-                server->copy_client_addr((struct sockaddr *)&(sub_server->client_addr()), sizeof(struct sockaddr_in));
-                sub_server->server_name().assign((char *)data_buff);
-                sub_server->init(base, _sub_udp_routine, NULL);
-            }
-        }
-    } while(FALSE == should_quit);
-
-    // tell second server to quit
-    if (0) {
-        const char str[] = "quit";
-        UDPClient *client = server->new_UDP_client(NetIPv4);
-        client->send(str, sizeof(str), NULL, "127.0.0.1", _UDP_PORT_2);
-        server->delete_client(client);
-        client = NULL;
+    // first of all, read client request
+    status = session->recv(data_buff.mutable_raw_data(), data_buff.buff_capacity(), &recv_len, 2.0);
+    if (FALSE == status.is_ok()) {
+        LOG("sesssion recv error: %s", status.c_err_msg());
+        return;
     }
-    else {
-        const char str[] = "quit";
-        server->send(str, sizeof(str), NULL, "127.0.0.1", _UDP_PORT_2);
+
+    // read and handle DNS request
+    data_buff.set_raw_data_length(recv_len ++);
+    data_buff.append_nul();
+    LOG("Get client request: %s", ::andrewmc::cpptools::dump_data_to_string(data_buff).c_str());
+
+    DNSClient *dns = session->new_DNS_client(session->network_type());
+    if (NULL == dns) {
+        LOG("Failed to create DNS client");
+        return;
     }
-    
-    LOG("END");
-    return;
-}
 
+    status = dns->resolve((char *)(data_buff.c_data()), 2.0);
+    if (FALSE == status.is_ok()) {
+        LOG("Failed to resolve DNS: %s", status.c_err_msg());
+        session->delete_client(dns);
+        return;
+    }
 
-static void _sub_udp_routine(evutil_socket_t fd, Event *abs_server, void *arg)
-{
-    DNSServer *server = (DNSServer *)abs_server;
-    struct Error err;
+    // read DNS response
+    std::string dns_result_str = "resource not found";
+    const DNSResult *dns_result = dns->dns_result((char *)(data_buff.c_data()));
 
-    DNSClient *dns = server->new_DNS_client(NetIPv4);
-    NetType_t type;
-
-    const char *request_name = server->server_name().c_str();
-    LOG("parameters sent from client: '%s'", request_name);
-
-    LOG("Default DNS server 1: %s(%d)", dns->default_dns_server(0, &type).c_str(), type);
-    LOG("Default DNS server 2: %s(%d)", dns->default_dns_server(1, &type).c_str(), type);
-
-    err = dns->resolve(request_name, 2.0);
-    LOG("resolve result: %s", err.c_err_msg());
-    LOG("DNS server address: %s:%u", dns->remote_addr().c_str(), dns->remote_port());
-
-    if (err.is_ok())
+    for (size_t index = 0; index < dns_result->resource_record_count(); index ++)
     {
-        std::string ret;
-        ret += "resource \"";
-        ret += request_name;
-        ret += "\" not found.";
-
-        const DNSResult *dns_result = dns->dns_result(request_name);
-        for (size_t index = 0; index < dns_result->resource_record_count(); index ++)
+        const DNSResourceRecord *rr = dns_result->resource_record(index);
+        if (DnsRRType_IPv4Addr == rr->record_type())
         {
-            const DNSResourceRecord *rr = dns_result->resource_record(index);
-            if (DnsRRType_IPv4Addr == rr->record_type())
-            {
-                ret.assign(rr->record_address());
-                break;
-            }
+            dns_result_str.assign(rr->record_address());
+            break;
         }
-
-        LOG("Send back message: %s", ret.c_str());
-        UDPClient *udp = server->new_UDP_client(NetIPv4);
-        udp->send(ret.c_str(), ret.length() + 1, NULL, (const struct sockaddr *)&(server->client_addr()), sizeof(struct sockaddr_in));
-    }
-    else
-    {
-        const char *err_msg = err.c_err_msg();
-        UDPClient *udp = server->new_UDP_client(NetIPv4);
-        udp->send(err_msg, strlen(err_msg) + 1, NULL, (const struct sockaddr *)&(server->client_addr()), sizeof(struct sockaddr_in));
-        server->delete_client(udp);
-        udp = NULL;
     }
 
-    LOG("Sub service ends");
+    // send DNS result back
+    status = session->reply(dns_result_str.c_str(), dns_result_str.length());
+    if (status.is_error()) {
+        LOG("Failed to reply DNS result: %s", status.c_err_msg());
+        return;
+    }
+
+    // DNS resolve OK
+    session->delete_client(dns);
+    dns = NULL;
+
+    // end
+    LOG("Session ends");
     return;
 }
 
@@ -214,7 +129,7 @@ int main(int argc, char *argv[])
     UDPServer *server_A = new UDPServer;
     LOG("Hello, libcoevent! Base: %s", base->identifier().c_str());
 
-    server_A->init(base, _main_server_routine, NetIPv4, _UDP_PORT, base);
+    server_A->init_session_mode(base, _udp_session_routine, NetIPv4, _UDP_PORT, base);
     base->run();
 
     LOG("libcoevent base ends");
