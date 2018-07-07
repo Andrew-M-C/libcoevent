@@ -98,7 +98,6 @@ void Error::set_sys_errno()
     _sys_errno = (uint16_t)errno;
     _lib_errno = 0;
     _ssize_ret = 0;
-    _err_msg.clear();
     return;
 }
 
@@ -108,7 +107,6 @@ void Error::set_sys_errno(int sys_errno)
     _sys_errno = (uint16_t)sys_errno;
     _lib_errno = 0;
     _ssize_ret = 0;
-    _err_msg.clear();
     return;
 }
 
@@ -130,9 +128,7 @@ void Error::set_app_errno(ErrCode_t lib_errno, const char *c_err_msg)
             _err_msg = g_error_msg_list[lib_errno];
         }
         else {
-            char msg[32];
-            sprintf(msg, "unknown error code %u", (unsigned)lib_errno);
-            _err_msg = msg;
+            _err_msg = "unknown error code";
         }
     }
     else {
@@ -161,8 +157,11 @@ const char *Error::c_err_msg()
     if (_sys_errno != 0xFFFF) {
         return strerror((int)_sys_errno);
     }
+    else if (_err_msg) {
+        return _err_msg;
+    }
     else {
-        return _err_msg.c_str();
+        return g_error_msg_list[0];
     }
 }
 

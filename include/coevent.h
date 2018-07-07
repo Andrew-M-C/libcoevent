@@ -49,11 +49,11 @@ private:
     uint16_t _sys_errno;    // error defined in "errno.h"
     uint16_t _lib_errno;    // error defined by libcoevent in coevent_const.h
     ssize_t  _ssize_ret;
-    std::string _err_msg;
+    const char *_err_msg;
 
 public:
     Error():
-        _sys_errno(0),_lib_errno(0),_ssize_ret(0)
+        _sys_errno(0),_lib_errno(0),_ssize_ret(0),_err_msg(NULL)
     {}
 
     BOOL is_error();

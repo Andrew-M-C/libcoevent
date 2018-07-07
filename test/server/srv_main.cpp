@@ -56,6 +56,7 @@ static ssize_t _print(const char *format, ...)
 static void _udp_session_routine(evutil_socket_t fd, Event *abs_server, void *arg)
 {
     UDPSession *session = (UDPSession *)abs_server;
+    UDPServer *server = (UDPServer *)arg;
     struct Error status;
 
     ::andrewmc::cpptools::Data data_buff;
@@ -111,6 +112,21 @@ static void _udp_session_routine(evutil_socket_t fd, Event *abs_server, void *ar
     session->delete_client(dns);
     dns = NULL;
 
+    // wait for client's goodbye
+    data_buff.set_length(0);
+    status = session->recv(data_buff.mutable_raw_data(), data_buff.buff_capacity(), &recv_len, 2.0);
+    if (FALSE == status.is_ok()) {
+        LOG("sesssion recv error: %s", status.c_err_msg());
+        return;
+    }
+    data_buff.set_raw_data_length(recv_len ++);
+    data_buff.append_nul();
+    LOG("Get message, length %u: %s", (unsigned)recv_len, (char *)(data_buff.c_data()));
+
+    // send goodbye back
+    const char goodbye[] = "Goodbye!";
+    session->reply(goodbye, sizeof(goodbye));
+
     // end
     LOG("Session ends");
     return;
@@ -129,7 +145,7 @@ int main(int argc, char *argv[])
     UDPServer *server_A = new UDPServer;
     LOG("Hello, libcoevent! Base: %s", base->identifier().c_str());
 
-    server_A->init_session_mode(base, _udp_session_routine, NetIPv4, _UDP_PORT, base);
+    server_A->init_session_mode(base, _udp_session_routine, NetIPv4, _UDP_PORT, server_A);
     base->run();
 
     LOG("libcoevent base ends");

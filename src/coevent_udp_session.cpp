@@ -474,6 +474,11 @@ struct Error UDPItnlSession::recv_in_timeval(void *data_out, const size_t len_li
         if (recv_stat < 0) {
             _status.set_sys_errno();
         }
+        else if (0 == recv_stat) {
+            DEBUG("EAGAIN");
+            *_libevent_what_storage &= ~EV_READ;
+            return recv_in_timeval(data_out, len_limit, len_out, timeout);
+        }
         else {
             // read data length and then fetch data
             if (len_limit < _data_len_to_read) {

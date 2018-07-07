@@ -517,6 +517,7 @@ struct Error UDPItnlClient::recv_in_timeval(void *data_out, const size_t len_lim
         }
         else if (0 == recv_len) {
             *_libevent_what_storage &=~ (EV_READ);
+            return recv_in_timeval(data_out, len_limit, len_out, timeout);
         }
     }
     else {

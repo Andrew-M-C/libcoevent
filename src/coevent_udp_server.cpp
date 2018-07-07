@@ -121,10 +121,12 @@ static void _session_mode_worker(evutil_socket_t fd, Event *abs_server, void *li
     do {
         recv_len = 0;
         status = server->recv((void *)data_buff, sizeof(data_buff), &recv_len);
-        if (status.is_ok())
+        if (status.is_ok() && (recv_len > 0))
         {
             std::string remote_ip = server->client_addr();
             unsigned remote_port = server->client_port();
+
+            DEBUG("Got data: %s", ::andrewmc::cpptools::dump_data_to_string(data_buff, recv_len).c_str());
 
             char remote_key_buff[128];
             snprintf(remote_key_buff, sizeof(remote_key_buff), "%s:%u", remote_ip.c_str(), remote_port);
@@ -711,6 +713,13 @@ struct Error UDPServer::recv_in_timeval(void *data_out, const size_t len_limit, 
         recv_len = recv_from(_fd(), data_out, len_limit, 0, _remote_sock_addr(), _remote_sock_addr_len());
         if (recv_len < 0) {
             _status.set_sys_errno();
+        }
+
+        // EAGAIN
+        if (0 == recv_len) {
+            DEBUG("EAGAIN");
+            *_libevent_what_storage &= ~EV_READ;
+            return recv_in_timeval(data_out, len_limit, len_out, timeout);
         }
     }
     else {

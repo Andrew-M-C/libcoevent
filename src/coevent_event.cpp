@@ -6,6 +6,8 @@
 
 using namespace andrewmc::libcoevent;
 
+static unsigned g_event_count = 0;
+
 // ==========
 #define __CO_EVENT_EVENT
 #ifdef __CO_EVENT_EVENT
@@ -17,7 +19,7 @@ Event::Event()
     _custom_storage = NULL;
     _custom_storage_size = 0;
 
-    DEBUG("Create event");
+    DEBUG("Create event %p, event count %u", this, ++g_event_count);
     return;
 }
 
@@ -31,7 +33,7 @@ Event::~Event()
         _custom_storage_size = 0;
     }
 
-    DEBUG("Delete %s", this->identifier().c_str());
+    DEBUG("Delete event %p, event count %u, (%s)", this, --g_event_count, this->identifier().c_str());
     return;
 }
 
