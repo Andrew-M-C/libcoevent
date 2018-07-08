@@ -152,6 +152,55 @@ private:
     void _parse_dns_response(const uint8_t *c_data, size_t data_len);
 };
 
+
+// Actual implementation of UDPSession
+class UDPItnlSession : public UDPSession {
+protected:
+    void        *_event_arg;
+    int         _fd;
+    struct sockaddr_storage _self_addr;
+    struct sockaddr_storage _remote_addr;
+    socklen_t   _remote_addr_len;
+    uint32_t    *_libevent_what_storage;
+    unsigned    _port;
+    int         _server_fd;
+
+    ::andrewmc::cpptools::Data _data_buff;
+    size_t      _data_offset;
+    size_t      _data_len_to_read;
+
+    void _clear();
+
+public:
+    UDPItnlSession();
+    virtual ~UDPItnlSession();
+
+    NetType_t network_type();
+
+    struct Error init(Base *base, int server_fd, WorkerFunc func, const struct sockaddr *remote_addr, socklen_t addr_len, void *user_arg);    // auto_free is TRUE
+
+    struct Error reply(const void *data, const size_t data_len, size_t *send_len_out_nullable = NULL);
+    struct Error recv(void *data_out, const size_t len_limit, size_t *len_out_nullable, double timeout_seconds = 0);
+    struct Error recv_in_timeval(void *data_out, const size_t len_limit, size_t *len_out_nullable, const struct timeval &timeout);
+    struct Error recv_in_mimlisecs(void *data_out, const size_t len_limit, size_t *len_out_nullable, unsigned timeout_milisecs);
+
+    struct Error forward_incoming_data(const void *c_data, size_t data_len);
+
+    struct Error sleep(double seconds);
+    struct Error sleep(struct timeval &sleep_time);
+    struct Error sleep_milisecs(unsigned mili_secs);
+
+    std::string remote_addr();      // valid in IPv4 or IPv6 type
+    unsigned remote_port();         // valid in IPv4 or IPv6 type
+    void copy_remote_addr(struct sockaddr *addr_out, socklen_t addr_len);
+
+public:
+    int port() const;
+
+protected:
+    struct stCoRoutine_t *_coroutine();
+};
+
 }   // end of namespace libcoevent
 }   // end of namespace andrewmc
 #endif  // EOF

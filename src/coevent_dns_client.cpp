@@ -158,8 +158,19 @@ DNSItnlClient::DNSItnlClient()
 
 DNSItnlClient::~DNSItnlClient()
 {
+    DEBUG("Now delete DNS client %p", this);
+
+    for (std::map<std::string, DNSResult *>::iterator each_result = _dns_result.begin();
+        each_result != _dns_result.end();
+        each_result ++)
+    {
+        delete each_result->second;
+    }
+    _dns_result.clear();
+
     if (_udp_client)
     {
+        DEBUG("Now delete UDP client %p", _udp_client);
         delete _udp_client;
         _udp_client = NULL;
     }
@@ -188,6 +199,7 @@ struct Error DNSItnlClient::init(Server *server, struct stCoRoutine_t *coroutine
 
     _init();
     _udp_client = new UDPItnlClient;
+    server->owner()->put_event_under_control(this);
     _status = _udp_client->init(server, coroutine, network_type, user_arg);
     return _status;
 }
@@ -204,11 +216,13 @@ const DNSResult *DNSItnlClient::dns_result(const std::string &domain_name)
 {
     std::map<std::string, DNSResult *>::iterator dns_item = _dns_result.find(domain_name);
     if (dns_item == _dns_result.end()) {
+        DEBUG("DNS recode for %s not found", domain_name.c_str());
         return NULL;
     }
 
     // check if the object is valid
     if (0 == dns_item->second->time_to_live())  {
+        DEBUG("DNS record for %s timeout", domain_name.c_str());
         _dns_result.erase(dns_item);
         return NULL;
     }
@@ -269,6 +283,7 @@ void DNSItnlClient::_parse_dns_response(const uint8_t *data_buff, size_t data_le
 {
     DNSResult *result = new DNSResult;
     if (result->parse_from_udp_payload(data_buff, data_len)) {
+        DEBUG("%s DNS record found", result->domain_name().c_str());
         _dns_result[result->domain_name()] = result;
     }
     else {
@@ -317,19 +332,22 @@ struct Error DNSItnlClient::resolve_in_timeval(const std::string &domain_name, c
     // get default DNS ip address
     if (0 == dns_ip.length())
     {
-        // read forst default DNS server
-        std::vector<std::string>::iterator each_ip = g_DNS_IPs.begin();
-        std::vector<NetType_t>::iterator each_type = g_DNS_network_type.begin();
+        if (0 == g_DNS_IPs.size()) {
+            // read DNS conf once.
+            dns_ip = default_dns_server(0, NULL);
+        }
 
-        do {
-            if (network_type() == *each_type) {
-                dns_ip.assign(*each_ip);
+        for (unsigned index = 0; index < g_DNS_IPs.size(); index ++)
+        {
+            NetType_t type = NetUnknown;
+            dns_ip = default_dns_server(index, &type);
+
+            DEBUG("%u - %s", (unsigned)type, dns_ip.c_str());
+
+            if (network_type() == type) {
                 break;
             }
-            each_ip ++;
-            each_type ++;
         }
-        while(each_ip != g_DNS_IPs.end());
         
         // failed to read default DNS
         if (0 == dns_ip.length()) {
@@ -420,7 +438,11 @@ struct Error DNSItnlClient::resolve_in_timeval(const std::string &domain_name, c
 
             if (dns_result(domain_name)) {
                 // OK, searched
+                DEBUG("DNS resuest found");
                 should_continue_recv = FALSE;
+            }
+            else {
+                DEBUG("Not the DNS request we are loking for");
             }
         }   // end of if (FALSE == _status.is_ok())
 

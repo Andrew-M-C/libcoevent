@@ -54,11 +54,11 @@ all: $(LIBCO_TARGET) $(TARGET_SO) $(TARGET_A)
 
 # libcoevent
 $(TARGET_SO): $(BIN_DIR) $(C_OBJS) $(CPP_OBJS) $(ASM_OBJS)
-	@echo "deps = "$^
+	@echo ".so deps = "$^
 	$(FINAL_CC) -o $@ $(CPP_OBJS) $(CPPFLAGS) -shared
 
 $(TARGET_A): $(BIN_DIR) $(C_OBJS) $(CPP_OBJS) $(ASM_OBJS)
-	@echo "deps = "$^
+	@echo ".a deps = "$^
 	$(AR) r $@ $(C_OBJS) $(CPP_OBJS) $(ASM_OBJS)
 
 $(BIN_DIR):

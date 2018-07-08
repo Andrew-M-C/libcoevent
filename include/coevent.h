@@ -49,11 +49,11 @@ private:
     uint16_t _sys_errno;    // error defined in "errno.h"
     uint16_t _lib_errno;    // error defined by libcoevent in coevent_const.h
     ssize_t  _ssize_ret;
-    std::string _err_msg;
+    const char *_err_msg;
 
 public:
     Error():
-        _sys_errno(0),_lib_errno(0),_ssize_ret(0)
+        _sys_errno(0),_lib_errno(0),_ssize_ret(0),_err_msg(NULL)
     {}
 
     BOOL is_error();
@@ -155,7 +155,7 @@ protected:
 public:
     NoServer();
     virtual ~NoServer();
-    struct Error init(Base *base, WorkerFunc func, void *user_arg, BOOL auto_free = TRUE);
+    struct Error init(Base *base, WorkerFunc func, void *user_arg = NULL, BOOL auto_free = TRUE);
 
     struct Error sleep(double seconds);     // can ONLY be incoked inside coroutine
     struct Error sleep(const struct timeval &sleep_time);
@@ -168,7 +168,7 @@ protected:
 };
 
 
-// UDP event
+// UDP server
 class UDPServer : public Server {
 protected:
     void            *_event_arg;
@@ -189,13 +189,17 @@ protected:
 
 public:
     UDPServer();
-    ~UDPServer();
+    virtual ~UDPServer();
 
     struct Error init(Base *base, WorkerFunc func, const struct sockaddr *addr, socklen_t addr_len, void *user_arg = NULL, BOOL auto_free = TRUE);
-    struct Error init(Base *base, WorkerFunc func, const struct sockaddr &addr, socklen_t addr_len, void *user_arg = NULL, BOOL auto_free = TRUE);
     struct Error init(Base *base, WorkerFunc func, NetType_t network_type, int bind_port = 0, void *user_arg = NULL, BOOL auto_free = TRUE);
     struct Error init(Base *base, WorkerFunc func, const char *bind_path, void *user_arg = NULL, BOOL auto_free = TRUE);
     struct Error init(Base *base, WorkerFunc func, std::string &bind_path, void *user_arg = NULL, BOOL auto_free = TRUE);
+
+    // session mode does not support AF_UNIX
+    struct Error init_session_mode(Base *base, WorkerFunc session_func, const struct sockaddr *addr, socklen_t addr_len, void *user_arg = NULL, BOOL auto_free = TRUE);
+    struct Error init_session_mode(Base *base, WorkerFunc session_func, NetType_t network_type, int bind_port = 0, void *user_arg = NULL, BOOL auto_free = TRUE);
+    struct Error quit_session_mode_server();
 
     NetType_t network_type();
     const char *c_socket_path();    // valid in local type
@@ -227,6 +231,29 @@ private:
     socklen_t *_remote_sock_addr_len();
 protected:
     struct stCoRoutine_t *_coroutine();
+};
+
+
+// UDP Session
+class UDPSession : public Server {
+public:
+    UDPSession(){};
+    virtual ~UDPSession(){};
+
+    virtual NetType_t network_type() = 0;
+
+    virtual struct Error reply(const void *data, const size_t data_len, size_t *send_len_out_nullable = NULL) = 0;
+    virtual struct Error recv(void *data_out, const size_t len_limit, size_t *len_out_nullable, double timeout_seconds = 0) = 0;
+    virtual struct Error recv_in_timeval(void *data_out, const size_t len_limit, size_t *len_out_nullable, const struct timeval &timeout) = 0;
+    virtual struct Error recv_in_mimlisecs(void *data_out, const size_t len_limit, size_t *len_out_nullable, unsigned timeout_milisecs) = 0;
+
+    virtual struct Error sleep(double seconds) = 0;
+    virtual struct Error sleep(struct timeval &sleep_time) = 0;
+    virtual struct Error sleep_milisecs(unsigned mili_secs) = 0;
+
+    virtual std::string remote_addr() = 0;      // valid in IPv4 or IPv6 type
+    virtual unsigned remote_port() = 0;         // valid in IPv4 or IPv6 type
+    virtual void copy_remote_addr(struct sockaddr *addr_out, socklen_t addr_len) = 0;
 };
 
 
@@ -300,8 +327,11 @@ public:
     virtual ~DNSResult();
     const std::string &domain_name() const;
     std::vector<std::string> IP_addresses();
-    time_t time_to_live();
+    time_t time_to_live() const;
     BOOL parse_from_udp_payload(const void *data, const size_t length);
+
+    size_t resource_record_count() const;
+    const DNSResourceRecord *resource_record(size_t index) const;
 };
 
 
