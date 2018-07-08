@@ -56,7 +56,6 @@ static ssize_t _print(const char *format, ...)
 static void _udp_session_routine(evutil_socket_t fd, Event *abs_server, void *arg)
 {
     UDPSession *session = (UDPSession *)abs_server;
-    UDPServer *server = (UDPServer *)arg;
     struct Error status;
 
     ::andrewmc::cpptools::Data data_buff;
@@ -74,6 +73,17 @@ static void _udp_session_routine(evutil_socket_t fd, Event *abs_server, void *ar
     data_buff.append_nul();
     LOG("Get client request: %s", ::andrewmc::cpptools::dump_data_to_string(data_buff).c_str());
 
+    // check if this is a quit command
+    const char QUIT_COMMAND[] = "quit";
+    if (0 == strcmp(QUIT_COMMAND, (char *)data_buff.c_data()))
+    {
+        UDPServer *server = (UDPServer *)arg;
+        LOG("Got quit request");
+        server->quit_session_mode_server();
+        return;
+    }
+
+    // send DNS request
     DNSClient *dns = session->new_DNS_client(session->network_type());
     if (NULL == dns) {
         LOG("Failed to create DNS client");

@@ -57,6 +57,7 @@ ssize_t recv_from(int sockfd, void *buf, size_t len, int flags, struct sockaddr 
 // libevent flag check
 BOOL event_is_timeout(uint32_t libevent_what);
 BOOL event_readable(uint32_t libevent_what);
+BOOL event_got_signal(uint32_t libevent_what);
 
 // struct sockaddr conversion
 void convert_str_to_sockaddr_in(const std::string &str, unsigned port, struct sockaddr_in *addr_out);
@@ -164,6 +165,7 @@ protected:
     uint32_t    *_libevent_what_storage;
     unsigned    _port;
     int         _server_fd;
+    UDPServer   *_server;
 
     ::andrewmc::cpptools::Data _data_buff;
     size_t      _data_offset;
@@ -177,7 +179,7 @@ public:
 
     NetType_t network_type();
 
-    struct Error init(Base *base, int server_fd, WorkerFunc func, const struct sockaddr *remote_addr, socklen_t addr_len, void *user_arg);    // auto_free is TRUE
+    struct Error init(UDPServer *server, int server_fd, WorkerFunc func, const struct sockaddr *remote_addr, socklen_t addr_len, void *user_arg);   // auto_free is TRUE
 
     struct Error reply(const void *data, const size_t data_len, size_t *send_len_out_nullable = NULL);
     struct Error recv(void *data_out, const size_t len_limit, size_t *len_out_nullable, double timeout_seconds = 0);
@@ -193,6 +195,8 @@ public:
     std::string remote_addr();      // valid in IPv4 or IPv6 type
     unsigned remote_port();         // valid in IPv4 or IPv6 type
     void copy_remote_addr(struct sockaddr *addr_out, socklen_t addr_len);
+
+    UDPServer *server();
 
 public:
     int port() const;

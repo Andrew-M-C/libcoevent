@@ -38,6 +38,7 @@ typedef enum {
 
     ERR_INTERRUPTED_SLEEP,
     ERR_TIMEOUT,
+    ERR_SIGNAL,
 
     ERR_NOT_INITIALIZED,
     ERR_OBJ_NOT_FOUND,

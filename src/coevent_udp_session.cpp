@@ -18,6 +18,7 @@ using namespace andrewmc::libcoevent;
 
 struct _EventArg {
     UDPSession          *event;
+    UDPServer           *server;
     int                 fd;
     uint32_t            *libevent_what_ptr;
 
@@ -66,11 +67,12 @@ static void _libevent_callback(evutil_socket_t fd, short what, void *libevent_ar
     // is coroutine end?
     if (is_coroutine_end(arg->coroutine)) {
         // delete the event if this is under control of the base
-        UDPSession *event = arg->event;
-        Base *base  = event->owner();
+        UDPSession *session = arg->event;
+        Base *base = session->owner();
 
-        DEBUG("evudp %s ends", event->identifier().c_str());
-        base->delete_event_under_control(event);
+        DEBUG("evudp %s ends", session->identifier().c_str());
+        arg->server->notify_session_ends(session);
+        base->delete_event_under_control(session);
     }
 
     // done
@@ -156,12 +158,12 @@ void UDPItnlSession::_clear()
 
 
 
-struct Error UDPItnlSession::init(Base *base, int server_fd, WorkerFunc func, const struct sockaddr *remote_addr, socklen_t addr_len, void *user_arg)
+struct Error UDPItnlSession::init(UDPServer *server, int server_fd, WorkerFunc func, const struct sockaddr *remote_addr, socklen_t addr_len, void *user_arg)
 {
     const BOOL auto_free = TRUE;
 
-    if (!(base && remote_addr && server_fd > 0)) {
-        DEBUG("%p, %p, %u", base, remote_addr, (unsigned)server_fd);
+    if (!(server && remote_addr && server_fd > 0)) {
+        DEBUG("%p, %p, %u", server, remote_addr, (unsigned)server_fd);
         _status.set_app_errno(ERR_PARA_NULL);
         return _status;
     }
@@ -175,6 +177,7 @@ struct Error UDPItnlSession::init(Base *base, int server_fd, WorkerFunc func, co
 
     _clear();
     _server_fd = server_fd;
+    _server = server;
 
     // create arguments
     struct _EventArg *arg = (struct _EventArg *)malloc(sizeof(*arg));
@@ -185,6 +188,7 @@ struct Error UDPItnlSession::init(Base *base, int server_fd, WorkerFunc func, co
     }
     _event_arg = arg;
     arg->event = this;
+    arg->server = server;
     arg->user_arg = user_arg;
     arg->worker_func = func;
     arg->libevent_what_ptr = _libevent_what_storage;
@@ -288,8 +292,8 @@ struct Error UDPItnlSession::init(Base *base, int server_fd, WorkerFunc func, co
     arg->fd = _fd;
 
     // create event
-    _owner_base = base;
-    _event = event_new(base->event_base(), _fd, EV_TIMEOUT | EV_READ, _libevent_callback, arg);     // should NOT use EV_ET or EV_PERSIST
+    _owner_base = server->owner();
+    _event = event_new(_owner_base->event_base(), _fd, EV_TIMEOUT | EV_READ, _libevent_callback, arg);     // should NOT use EV_ET or EV_PERSIST
     if (NULL == _event) {
         ERROR("Failed to new a UDP session");
         _clear();
@@ -304,7 +308,7 @@ struct Error UDPItnlSession::init(Base *base, int server_fd, WorkerFunc func, co
 
     // automatic free
     if (auto_free) {
-        base->put_event_under_control(this);
+        _owner_base->put_event_under_control(this);
     }
 
     _status.clear_err();
