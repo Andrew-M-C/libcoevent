@@ -28,6 +28,7 @@ const char *g_error_msg_list[] = {
 
     "sleep action is interrupted",
     "timeout",
+    "interrupted by signal",
 
     "object is not initialized",
     "object not found",
@@ -171,6 +172,18 @@ uint32_t Error::err_code()
     uint32_t ret = (uint32_t)_sys_errno;
     ret += ((uint32_t)_lib_errno) << 16;
     return ret;
+}
+
+
+uint32_t Error::app_err_code()
+{
+    return _lib_errno;
+}
+
+
+uint32_t Error::sys_err_code()
+{
+    return _sys_errno;
 }
 
 #endif  // end of Error

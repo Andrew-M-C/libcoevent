@@ -28,6 +28,7 @@ class Event;
 class Client;
 class UDPClient;
 class DNSClient;
+class UDPSession;
 
 
 // network type
@@ -70,6 +71,8 @@ public:
     void set_app_errno(ErrCode_t lib_errno, const std::string &err_msg);
     const char *c_err_msg();
     uint32_t err_code();
+    uint32_t app_err_code(void);
+    uint32_t sys_err_code(void);
 };
 
 
@@ -200,6 +203,7 @@ public:
     struct Error init_session_mode(Base *base, WorkerFunc session_func, const struct sockaddr *addr, socklen_t addr_len, void *user_arg = NULL, BOOL auto_free = TRUE);
     struct Error init_session_mode(Base *base, WorkerFunc session_func, NetType_t network_type, int bind_port = 0, void *user_arg = NULL, BOOL auto_free = TRUE);
     struct Error quit_session_mode_server();
+    struct Error notify_session_ends(UDPSession *session);      // actually protected
 
     NetType_t network_type();
     const char *c_socket_path();    // valid in local type

@@ -176,6 +176,12 @@ BOOL andrewmc::libcoevent::event_readable(uint32_t libevent_what)
 }
 
 
+BOOL andrewmc::libcoevent::event_got_signal(uint32_t libevent_what)
+{
+    return (libevent_what & EV_SIGNAL) ? TRUE : FALSE;
+}
+
+
 void andrewmc::libcoevent::convert_str_to_sockaddr_in(const std::string &str, unsigned port, struct sockaddr_in *addr)
 {
     if (NULL == addr) {

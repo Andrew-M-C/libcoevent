@@ -67,12 +67,15 @@ static void _libevent_callback(evutil_socket_t fd, short what, void *libevent_ar
     // switch into the coroutine
     if (arg->libevent_what_ptr) {
         *(arg->libevent_what_ptr) = (uint32_t)what;
-        DEBUG("libevent what: 0x%08x - %s%s", (unsigned)what, event_is_timeout(what) ? "timeout " : "", event_readable(what) ? "read" : "");
+        DEBUG("libevent what: 0x%08x - %s%s%s", (unsigned)what, event_is_timeout(what) ? "timeout " : "", event_readable(what) ? "read" : "", event_got_signal(what) ? "signal" : "");
     }
+
+    // handle control to user application
     co_resume(arg->coroutine);
 
     // is coroutine end?
-    if (is_coroutine_end(arg->coroutine)) {
+    if (is_coroutine_end(arg->coroutine))
+    {
         // delete the event if this is under control of the base
         UDPServer *event = arg->event;
         Base *base  = event->owner();
@@ -143,7 +146,7 @@ static void _session_mode_worker(evutil_socket_t fd, Event *abs_server, void *li
                 server->copy_client_addr((struct sockaddr *)&sock_addr, sock_len);
 
                 UDPItnlSession *session = new UDPItnlSession;
-                status = session->init(server->owner(), fd, worker_func, (struct sockaddr *)&sock_addr, sock_len, user_arg);
+                status = session->init(server, fd, worker_func, (struct sockaddr *)&sock_addr, sock_len, user_arg);
                 if (FALSE == status.is_ok()) {
                     delete session;
                     ERROR("Failed to create UDP session: %s", status.c_err_msg());
@@ -154,6 +157,14 @@ static void _session_mode_worker(evutil_socket_t fd, Event *abs_server, void *li
                     session_collection[remote_key] = session;
                 }
             }
+        }
+        else if (ERR_SIGNAL == status.app_err_code()) {
+            // quit requested
+            DEBUG("Got signal, now we should quit server");
+            should_exit_udp = TRUE;
+        }
+        else {
+            ERROR("unrecognized err: %s, recv_len = %u", status.c_err_msg(), (unsigned)recv_len);
         }
 
     } while (FALSE == should_exit_udp);
@@ -554,6 +565,45 @@ struct Error UDPServer::init_session_mode(Base *base, WorkerFunc session_func, N
 }
 
 
+struct Error UDPServer::quit_session_mode_server()
+{
+    if (NULL == _event_arg) {
+        _status.set_app_errno(ERR_NOT_INITIALIZED);
+        return _status;
+    }
+    _status.clear_err();
+
+    event_active(_event, EV_SIGNAL, 0);
+    return _status;
+}
+
+
+struct Error UDPServer::notify_session_ends(UDPSession *session)
+{
+    struct _EventArg *arg = (struct _EventArg *)_event_arg;
+    std::string remote_ip = session->remote_addr();
+    unsigned remote_port = session->remote_port();
+
+    char remote_key_buff[128];
+    snprintf(remote_key_buff, sizeof(remote_key_buff), "%s:%u", remote_ip.c_str(), remote_port);
+
+    std::map<std::string, UDPItnlSession *> &session_collection = arg->session_collection;
+    std::map<std::string, UDPItnlSession *>::iterator session_in_control = session_collection.find(remote_key_buff);
+    
+    if (session_collection.end() != session_in_control)
+    {
+        DEBUG("dispatch session %s", session_in_control->second->identifier().c_str());
+        session_collection.erase(session_in_control);
+        _status.clear_err();
+    }
+    else {
+        _status.set_app_errno(ERR_OBJ_NOT_FOUND);
+    }
+
+    return _status;
+}
+
+
 #endif  // end of __INIT_SESSION_MODE
 
 
@@ -650,7 +700,13 @@ struct Error UDPServer::sleep(struct timeval &sleep_time)
 
     // determine libevent event masks
     uint32_t libevent_what = _libevent_what();
-    if (event_is_timeout(libevent_what))
+    if (event_got_signal(libevent_what))
+    {
+        // exit got
+        _status.set_app_errno(ERR_SIGNAL);
+        return _status;
+    }
+    else if (event_is_timeout(libevent_what))
     {
         // normally timeout
         _status.clear_err();
@@ -737,7 +793,12 @@ struct Error UDPServer::recv_in_timeval(void *data_out, const size_t len_limit, 
 
         // check if data read
         libevent_what = _libevent_what();
-        if (event_readable(libevent_what))
+        if (event_got_signal(libevent_what))
+        {
+            // exit got
+            _status.set_app_errno(ERR_SIGNAL);
+        }
+        else if (event_readable(libevent_what))
         {
             recv_len = recv_from(_fd(), data_out, len_limit, 0, _remote_sock_addr(), _remote_sock_addr_len());
             if (recv_len < 0) {
