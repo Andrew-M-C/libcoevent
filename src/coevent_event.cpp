@@ -33,6 +33,12 @@ Event::~Event()
         _custom_storage_size = 0;
     }
 
+    if (_event)
+    {
+        event_del(_event);
+        _event = NULL;
+    }
+
     DEBUG("Delete event %p, event count %u, (%s)", this, --g_event_count, this->identifier().c_str());
     return;
 }

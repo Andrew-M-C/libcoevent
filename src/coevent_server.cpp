@@ -20,6 +20,9 @@ typedef Event _super;
 
 UDPClient *Server::new_UDP_client(NetType_t network_type, void *user_arg)
 {
+    if (NULL == _coroutine()) {
+        return NULL;
+    }
     UDPItnlClient *client = new UDPItnlClient;
     client->init(this, _coroutine(), network_type, user_arg);
     _client_chain.insert(client);
@@ -29,6 +32,9 @@ UDPClient *Server::new_UDP_client(NetType_t network_type, void *user_arg)
 
 DNSClient *Server::new_DNS_client(NetType_t network_type, void *user_arg)
 {
+    if (NULL == _coroutine()) {
+        return NULL;
+    }
     DNSItnlClient *client = new DNSItnlClient;
     client->init(this, _coroutine(), network_type, user_arg);
     _client_chain.insert(client);
@@ -74,6 +80,12 @@ Server::~Server()
     _client_chain.clear();
 
     return;
+}
+
+
+struct stCoRoutine_t *Server::_coroutine()
+{
+    return NULL;
 }
 
 

@@ -205,6 +205,47 @@ protected:
     struct stCoRoutine_t *_coroutine();
 };
 
+
+// TCP session
+class TCPItnlSession : public TCPSession {
+protected:
+    int                     _fd;
+    struct sockaddr_storage _remote_addr;
+    socklen_t               _addr_len;
+
+    TCPServer               *_server;
+    uint32_t                *_libevent_what_storage;
+
+    void                    *_event_arg;
+
+public:
+    TCPItnlSession();
+    virtual ~TCPItnlSession();
+
+    NetType_t network_type();
+
+    struct Error init(TCPServer *server, int fd, WorkerFunc func, const struct sockaddr *remote_addr, socklen_t addr_len, void *user_arg);   // auto_free is TRUE
+
+    struct Error reply(const void *data, const size_t data_len, size_t *send_len_out_nullable = NULL);
+    struct Error recv(void *data_out, const size_t len_limit, size_t *len_out_nullable, double timeout_seconds = 0);
+    struct Error recv_in_timeval(void *data_out, const size_t len_limit, size_t *len_out_nullable, const struct timeval &timeout);
+    struct Error recv_in_mimlisecs(void *data_out, const size_t len_limit, size_t *len_out_nullable, unsigned timeout_milisecs);
+
+    struct Error sleep(double seconds);
+    struct Error sleep(struct timeval &sleep_time);
+    struct Error sleep_milisecs(unsigned mili_secs);
+
+    std::string remote_addr();      // valid in IPv4 or IPv6 type
+    unsigned remote_port();         // valid in IPv4 or IPv6 type
+    void copy_remote_addr(struct sockaddr *addr_out, socklen_t addr_len);
+
+    TCPServer *server();
+    int file_descriptor();
+
+private:
+    void _clear();
+};
+
 }   // end of namespace libcoevent
 }   // end of namespace andrewmc
 #endif  // EOF

@@ -25,10 +25,17 @@ namespace libcoevent {
 
 class Base;
 class Event;
+class Server;
 class Client;
+
+class UDPServer;
 class UDPClient;
 class DNSClient;
 class UDPSession;
+
+class TCPServer;
+class TCPSession;       // TODO:
+class TCPClient;        // TODO:
 
 
 // network type
@@ -76,6 +83,7 @@ public:
 };
 
 
+// ====================
 // event base of libcoevent
 class Base {
     // private implementations
@@ -97,7 +105,8 @@ public:
 };
 
 
-// abstract event of libcoevent
+// ====================
+// Base class of all libcoevent events
 class Event {
 protected:
     std::string     _identifier;
@@ -135,7 +144,7 @@ public:
     UDPClient *new_UDP_client(NetType_t network_type, void *user_arg = NULL);
     DNSClient *new_DNS_client(NetType_t network_type, void *user_arg = NULL);
 protected:
-    virtual struct stCoRoutine_t *_coroutine() = 0;
+    virtual struct stCoRoutine_t *_coroutine();
 };
 
 
@@ -151,6 +160,7 @@ public:
 };
 
 
+// ====================
 // pure event, no network interfaces supported
 class NoServer : public Server {
 protected:
@@ -171,6 +181,7 @@ protected:
 };
 
 
+// ====================
 // UDP server
 class UDPServer : public Server {
 protected:
@@ -286,6 +297,7 @@ public:
 };
 
 
+// ====================
 // DNSClient
 class DNSResult;
 class DNSResourceRecord;
@@ -358,6 +370,57 @@ public:
     const std::string &record_address() const;
 };
 
+
+// ====================
+// TCPServer
+class TCPServer : public Server {
+private:
+    void                        *_event_arg;
+    int                         _fd;
+    struct sockaddr_storage     _sock_addr;
+    socklen_t                   _sock_addr_len;
+    std::map<int, TCPSession *> _sessions;
+    unsigned                    _port;
+public:
+    TCPServer();
+    virtual ~TCPServer();
+
+    struct Error init_session_mode(Base *base, WorkerFunc session_func, const struct sockaddr *addr, socklen_t addr_len, void *user_arg = NULL, BOOL auto_free = TRUE);
+    struct Error init_session_mode(Base *base, WorkerFunc session_func, NetType_t network_type, int bind_port = 0, void *user_arg = NULL, BOOL auto_free = TRUE);
+    struct Error init_session_mode(Base *base, WorkerFunc session_func, const char *bind_path, void *user_arg = NULL, BOOL auto_free = TRUE);
+    struct Error init_session_mode(Base *base, WorkerFunc session_func, std::string &bind_path, void *user_arg = NULL, BOOL auto_free = TRUE);
+    struct Error quit_session_mode_server();
+    struct Error notify_session_ends(TCPSession *session);      // actually protected
+
+    NetType_t network_type();
+    const char *c_socket_path();    // valid in local type
+    int port();                     // valid in IPv4 or IPv6 type
+private:
+    void _clear();
+};
+
+
+// TCPSession
+class TCPSession : public Server {
+public:
+    TCPSession(){};
+    virtual ~TCPSession(){};
+
+    virtual NetType_t network_type() = 0;
+
+    virtual struct Error reply(const void *data, const size_t data_len, size_t *send_len_out_nullable = NULL) = 0;
+    virtual struct Error recv(void *data_out, const size_t len_limit, size_t *len_out_nullable, double timeout_seconds = 0) = 0;
+    virtual struct Error recv_in_timeval(void *data_out, const size_t len_limit, size_t *len_out_nullable, const struct timeval &timeout) = 0;
+    virtual struct Error recv_in_mimlisecs(void *data_out, const size_t len_limit, size_t *len_out_nullable, unsigned timeout_milisecs) = 0;
+
+    virtual struct Error sleep(double seconds) = 0;
+    virtual struct Error sleep(struct timeval &sleep_time) = 0;
+    virtual struct Error sleep_milisecs(unsigned mili_secs) = 0;
+
+    virtual std::string remote_addr() = 0;      // valid in IPv4 or IPv6 type
+    virtual unsigned remote_port() = 0;         // valid in IPv4 or IPv6 type
+    virtual void copy_remote_addr(struct sockaddr *addr_out, socklen_t addr_len) = 0;
+};
 
 
 

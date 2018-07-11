@@ -750,7 +750,7 @@ struct Error UDPServer::sleep(double seconds)
 struct Error UDPServer::recv_in_timeval(void *data_out, const size_t len_limit, size_t *len_out, const struct timeval &timeout)
 {
     ssize_t recv_len = 0;
-    uint32_t libevent_what = 0;
+    volatile uint32_t libevent_what = 0;
     struct _EventArg *arg = (struct _EventArg *)_event_arg;
 
     // param check
