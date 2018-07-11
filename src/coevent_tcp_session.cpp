@@ -90,6 +90,10 @@ static void _libevent_callback(evutil_socket_t fd, short what, void *libevent_ar
 
 TCPItnlSession::TCPItnlSession()
 {
+    char identifier[64];
+    sprintf(identifier, "TCP session %p", this);
+    _identifier = identifier;
+
     _fd = 0;
     _remote_addr.ss_family = (sa_family_t)0;
     _addr_len = 0;
@@ -183,6 +187,7 @@ struct Error TCPItnlSession::init(TCPServer *server, int fd, WorkerFunc func, co
     }
 
     if (addr_len < _addr_len) {
+        ERROR("addr len is %u, should be %u", (unsigned)addr_len, (unsigned)_addr_len);
         _addr_len = 0;
         _status.set_app_errno(ERR_PARA_ILLEGAL);
         return _status;
@@ -382,6 +387,68 @@ struct Error TCPItnlSession::recv(void *data_out, const size_t len_limit, size_t
 
 
 // ==========
+#define __SLEEP_FUNCTIONS
+#ifdef __SLEEP_FUNCTIONS
+
+
+struct Error TCPItnlSession::sleep(struct timeval &sleep_time)
+{
+    struct _EventArg *arg = (struct _EventArg *)_event_arg;
+
+    _status.clear_err();
+    if ((0 == sleep_time.tv_sec) && (0 == sleep_time.tv_usec)) {
+        return _status;
+    }
+
+    event_add(_event, &sleep_time);
+    co_yield(arg->coroutine);
+
+    // determine libevent event masks
+    uint32_t libevent_what = (_libevent_what_storage) ? *_libevent_what_storage : 0;
+    if (event_is_timeout(libevent_what))
+    {
+        // normally timeout
+        _status.clear_err();
+        return _status;
+    }
+    else if (event_readable(libevent_what))
+    {
+        // read event occurred
+        _status.set_app_errno(ERR_INTERRUPTED_SLEEP);
+        return _status;
+    }
+    else {
+        // unexpected error
+        ERROR("%s - unexpected libevent masks: 0x%04x", identifier().c_str(), (unsigned)libevent_what);
+        _status.set_app_errno(ERR_UNKNOWN);
+        return _status;
+    }
+}
+
+
+struct Error TCPItnlSession::sleep_milisecs(unsigned mili_secs)
+{
+    struct timeval timeout = to_timeval_from_milisecs(mili_secs);
+    return sleep(timeout);
+}
+
+
+struct Error TCPItnlSession::sleep(double seconds)
+{
+    if (seconds <= 0) {
+        _status.clear_err();
+        return _status;
+    }
+    else {
+        struct timeval timeout = to_timeval(seconds);
+        return sleep(timeout);
+    }
+}
+
+#endif  // end of __SLEEP_FUNCTIONS
+
+
+// ==========
 #define __MISC_FUNCTIONS
 #ifdef __MISC_FUNCTIONS
 
@@ -394,6 +461,27 @@ TCPServer *TCPItnlSession::server()
 int TCPItnlSession::file_descriptor()
 {
     return _fd;
+}
+
+
+NetType_t TCPItnlSession::network_type()
+{
+    switch(_remote_addr.ss_family)
+    {
+        case AF_UNIX:
+            return NetLocal;
+            break;
+        case AF_INET:
+            return NetIPv4;
+            break;
+        case AF_INET6:
+            return NetIPv6;
+            break;
+        default:
+            return NetUnknown;
+            break;
+    }
+    return NetUnknown;
 }
 
 

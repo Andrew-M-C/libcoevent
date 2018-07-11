@@ -56,23 +56,31 @@ static void _libevent_callback(evutil_socket_t fd, short what, void *libevent_ar
         socklen_t sock_len = arg->sock_len;
         int client_fd = accept(fd, (struct sockaddr *)&remote_addr, &sock_len);
 
-        TCPItnlSession *session = new TCPItnlSession;
-        if (NULL == session) {
-            ERROR("Failed to create a TCP session");
-            close(client_fd);
+        if (client_fd < 0) {
+            ERROR("Failed in accept(): %s", strerror(errno));
         }
         else {
-            Error status = session->init(server, client_fd, arg->session_worker_func, (struct sockaddr *)&remote_addr, sock_len, arg->session_user_arg);
-            if (FALSE == status.is_ok()) {
-                ERROR("Failed to init TCP session: %s", status.c_err_msg());
+            DEBUG("Accepted incomming connection, fd = %d", client_fd);
+
+            TCPItnlSession *session = new TCPItnlSession;
+            if (NULL == session) {
+                ERROR("Failed to create a TCP session");
                 close(client_fd);
-                delete session;
-                session = NULL;
             }
             else {
-                (*(arg->sessions))[client_fd] = (TCPSession *)session;
+                Error status = session->init(server, client_fd, arg->session_worker_func, (struct sockaddr *)&remote_addr, sock_len, arg->session_user_arg);
+                if (FALSE == status.is_ok()) {
+                    ERROR("Failed to init TCP session: %s", status.c_err_msg());
+                    close(client_fd);
+                    delete session;
+                    session = NULL;
+                }
+                else {
+                    (*(arg->sessions))[client_fd] = (TCPSession *)session;
+                }
             }
         }
+
     }
     else {
         ERROR("Unrecognized event flag: 0x%02x", (unsigned)libevent_what);
@@ -133,6 +141,10 @@ void TCPServer::_clear()
 
 TCPServer::TCPServer()
 {
+    char identifier[64];
+    sprintf(identifier, "TCP server %p", this);
+    _identifier = identifier;
+
     _event_arg = NULL;
     _fd = 0;
     _sock_addr_len = 0;
@@ -162,6 +174,8 @@ struct Error TCPServer::init_session_mode(Base *base, WorkerFunc session_func, c
         return _status;
     }
 
+    _clear();
+
     switch (addr->sa_family)
     {
         case AF_INET:
@@ -180,15 +194,14 @@ struct Error TCPServer::init_session_mode(Base *base, WorkerFunc session_func, c
     }
 
     if (addr_len < _sock_addr_len) {
+        ERROR("addr len is %u, should be %u", (unsigned)addr_len, (unsigned)_sock_addr_len);
         _clear();
         _status.set_app_errno(ERR_PARA_ILLEGAL);
         return _status;
     }
 
-    _clear();
-
     // create arguments
-    struct _EventArg *arg = (struct _EventArg *)malloc(sizeof(struct _EventArg));
+    struct _EventArg *arg = (struct _EventArg *)malloc(sizeof(*arg));
     if (NULL == arg) {
         throw std::bad_alloc();
         _status.set_sys_errno();
@@ -204,7 +217,7 @@ struct Error TCPServer::init_session_mode(Base *base, WorkerFunc session_func, c
 
     // init sockets
     memcpy(&_sock_addr, addr, _sock_addr_len);
-    _fd = socket(addr->sa_family, SOCK_DGRAM, 0);
+    _fd = socket(addr->sa_family, SOCK_STREAM, 0);
     if (_fd < 0) {
         _clear();
         _status.set_sys_errno();
@@ -215,7 +228,15 @@ struct Error TCPServer::init_session_mode(Base *base, WorkerFunc session_func, c
     int status = bind(_fd, (struct sockaddr *)&_sock_addr, _sock_addr_len);
     if (status < 0) {
         _clear();
-        _status.set_sys_errno(errno);
+        _status.set_sys_errno();
+        return _status;
+    }
+
+    // listen
+    status = listen(_fd, 128);
+    if (status < 0) {
+        _clear();
+        _status.set_sys_errno();
         return _status;
     }
 
@@ -237,10 +258,11 @@ struct Error TCPServer::init_session_mode(Base *base, WorkerFunc session_func, c
         getsockname(_fd, (struct sockaddr *)(&addr6_buff), &sock_len);
         _port = (unsigned)ntohs(addr6_buff.sin6_port);
     }
+    DEBUG("Listen TCP port %u", _port);
 
     // create event
     _owner_base = base;
-    _event = event_new(base->event_base(), _fd, EV_READ, _libevent_callback, arg);
+    _event = event_new(base->event_base(), _fd, EV_READ | EV_PERSIST, _libevent_callback, arg);
     if (NULL == _event) {
         ERROR("Failed to new a TCP server event");
         _clear();

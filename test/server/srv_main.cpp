@@ -13,6 +13,7 @@ using namespace andrewmc::libcoevent;
 using namespace andrewmc::cpptools;
 
 #define _UDP_PORT       (2333)
+#define _TCP_PORT       (6666)
 
 #define LOG(fmt, args...)   _print("SERVER: %s, %s, %d: "fmt, __FILE__, __func__, __LINE__, ##args)
 static ssize_t _print(const char *format, ...)
@@ -145,6 +146,50 @@ static void _udp_session_routine(evutil_socket_t fd, Event *abs_server, void *ar
 
 #endif
 
+
+// ==========
+#define __TCP_SERVER
+#ifdef __TCP_SERVER
+
+static void _tcp_session_routine(evutil_socket_t fd, Event *abs_server, void *arg)
+{
+    TCPSession *session = (TCPSession *)abs_server;
+    struct Error status;
+    size_t recv_len = 0;
+
+    ::andrewmc::cpptools::Data data_buff;
+
+    status = session->recv(data_buff.mutable_raw_data(), data_buff.buff_capacity(), &recv_len, 2.0);
+    if (FALSE == status.is_ok()) {
+        LOG("TCP session error: %s", status.c_err_msg());
+        return;
+    }
+
+    data_buff.set_raw_data_length(recv_len);
+    data_buff.append_nul();
+
+    // read data
+    LOG("Got TCP session data: %s", ::andrewmc::cpptools::dump_data_to_string(data_buff).c_str());
+    if (0 == strcmp((char *)(data_buff.c_data()), "quit")) {
+        LOG("Now quit server");
+        TCPServer *server = (TCPServer *)arg;
+        server->quit_session_mode_server();
+    }
+
+    // reply
+    LOG("Now reply");
+    const char reply_msg[] = "Thank you for your TCP stream.";
+    session->reply(reply_msg, sizeof(reply_msg), &recv_len);
+    LOG("%u byte(s) sent", (unsigned)recv_len);
+
+    // end
+    LOG("TCP session ends");
+    return;
+}
+
+
+#endif
+
 // ==========
 #define __MAIN
 #ifdef __MAIN
@@ -152,16 +197,31 @@ static void _udp_session_routine(evutil_socket_t fd, Event *abs_server, void *ar
 int main(int argc, char *argv[])
 {
     Base *base = new Base;
+    Error status;
     UDPServer *server_A = new UDPServer;
+    TCPServer *server_B = new TCPServer;
     LOG("Hello, libcoevent! Base: %s", base->identifier().c_str());
 
-    server_A->init_session_mode(base, _udp_session_routine, NetIPv4, _UDP_PORT, server_A);
+    status = server_A->init_session_mode(base, _udp_session_routine, NetIPv4, _UDP_PORT, server_A);
+    if (FALSE == status.is_ok()) {
+        LOG("Init UDP server failed: %s", status.c_err_msg());
+        goto END;
+    }
+
+    status = server_B->init_session_mode(base, _tcp_session_routine, NetIPv4, _TCP_PORT, server_B);
+    if (FALSE == status.is_ok()) {
+        LOG("Init TCP server failed: %s", status.c_err_msg());
+        goto END;
+    }
+
     base->run();
 
+END:
     LOG("libcoevent base ends");
     delete base;
     base = NULL;
     server_A = NULL;
+    server_B = NULL;
 
     return 0;
 }
