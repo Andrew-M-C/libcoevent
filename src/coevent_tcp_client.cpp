@@ -12,33 +12,29 @@
 using namespace andrewmc::libcoevent;
 
 // ==========
-// necessary definitions
-#define __CO_EVENT_UDP_CLIENT_DEFINITIONS
-#ifdef __CO_EVENT_UDP_CLIENT_DEFINITIONS
+#define __EVENT_ARG_DEFINITION
+#ifdef __EVENT_ARG_DEFINITION
 
 struct _EventArg {
-    UDPItnlClient       *event;
+    TCPItnlClient       *client;
     int                 fd;
     uint32_t            *libevent_what_ptr;
 
     struct stCoRoutine_t *coroutine;
     void                *user_arg;
 
-    _EventArg(): event(NULL), fd(0), libevent_what_ptr(NULL), coroutine(NULL)
-    {}
 };
 
 #endif
 
 
 // ==========
-// libevent style callback, this callback is second part of the coroutine adapter
-#define __UDP_CLIENT_SERVER_CALLBACK
-#ifdef __UDP_CLIENT_SERVER_CALLBACK
+#define __LIBEVENT_CALLBACK
+#ifdef __LIBEVENT_CALLBACK
 
 static void _libevent_callback(evutil_socket_t fd, short what, void *libevent_arg)
 {
-    struct _EventArg *arg = (struct _EventArg *)libevent_arg;
+    struct _EventArg *arg = (struct _EventArg *)arg;
 
     // switch into the coroutine
     if (arg->libevent_what_ptr) {
@@ -50,7 +46,7 @@ static void _libevent_callback(evutil_socket_t fd, short what, void *libevent_ar
     // is coroutine end?
     if (is_coroutine_end(arg->coroutine)) {
         // delete the event if this is under control of the base
-        UDPItnlClient *client = arg->event;
+        TCPItnlClient *client = arg->client;
         Server *server = client->owner_server();
         Base *base = client->owner();
 
@@ -64,22 +60,37 @@ static void _libevent_callback(evutil_socket_t fd, short what, void *libevent_ar
 
 #endif
 
+
 // ==========
 #define __CONSTRUCT_AND_DESTRUCT
 #ifdef __CONSTRUCT_AND_DESTRUCT
 
-
-UDPItnlClient::UDPItnlClient()
+TCPItnlClient::TCPItnlClient()
 {
     char identifier[64];
-    sprintf(identifier, "UDP client %p", this);
+    sprintf(identifier, "TCP client %p", this);
     _identifier = identifier;
-    _init();
+
+    _event_arg = NULL;
+    _fd = 0;
+    _self_addr.ss_family = 0;
+    _remote_addr.ss_family = 0;
+    _addr_len = 0;
+    _server = NULL;
+
+    _libevent_what_storage = (uint32_t *)malloc(*_libevent_what_storage);
+    if (NULL == _libevent_what_storage) {
+        _clear();
+        _status.set_sys_errno();
+        throw std::bad_alloc();
+        return;
+    }
+
     return;
 }
 
 
-UDPItnlClient::~UDPItnlClient()
+TCPItnlClient::~TCPItnlClient()
 {
     _clear();
 
@@ -91,69 +102,212 @@ UDPItnlClient::~UDPItnlClient()
 }
 
 
-void UDPItnlClient::_init()
-{
-    _event_arg = NULL;
-    _owner_server = NULL;
-    _fd_ipv4 = 0;
-    _fd_ipv6 = 0;
-    _fd_unix = 0;
-    _remote_addr_len = 0;
-    _libevent_what_storage = NULL;
-
-    if (NULL == _libevent_what_storage) {
-        _libevent_what_storage = (uint32_t *)malloc(sizeof(*_libevent_what_storage));
-        if (NULL == _libevent_what_storage) {
-            ERROR("Failed to init storage");
-            throw std::bad_alloc();
-        }
-        else {
-            *_libevent_what_storage = 0;
-            //DEBUG("Init _libevent_what_storage OK: %p", _libevent_what_storage);
-        }
-    }
-    return;
-}
-
-
-void UDPItnlClient::_clear()
+void TCPItnlClient::_clear()
 {
     if (_event) {
-        DEBUG("Delete UDP client");
+        DEBUG("Delete TCP event");
         event_del(_event);
         _event = NULL;
     }
 
     if (_event_arg) {
-        struct _EventArg *arg = (struct _EventArg *)_event_arg;
+        free(_event_arg);
         _event_arg = NULL;
-
-        // do not remove coroutine because client does not own it
-
-        DEBUG("Delete _event_arg");
-        free(arg);
     }
 
-    if (_fd_ipv4) {
-        close(_fd_ipv4);
-    }
-    if (_fd_ipv6) {
-        close(_fd_ipv6);
-    }
-    if (_fd_unix) {
-        close(_fd_unix);
+    if (_fd > 0) {
+        close(_fd);
+        _fd = NULL;
     }
 
-    _fd = 0;
     _event_arg = NULL;
-    _fd_ipv4 = 0;
-    _fd_ipv6 = 0;
-    _fd_unix = 0;
+    _fd = 0;
+    _self_addr.ss_family = 0;
+    _remote_addr.ss_family = 0;
+    _addr_len = 0;
+    _server = NULL;
     return;
+}
+
+#endif
+
+
+// ==========
+#define __INIT_FUNCTIONS
+#ifdef __INIT_FUNCTIONS
+
+struct Error TCPItnlClient::init(Server *server, struct stCoRoutine_t *coroutine, NetType_t network_type, void *user_arg)
+{
+    if (!(server && coroutine)) {
+        _status.set_app_errno(ERR_PARA_NULL);
+        return _status;
+    }
+
+    switch(network_type)
+    {
+        case NetIPv4:
+            _addr_len = sizeof(struct sockaddr_in);
+            _self_addr.ss_family = AF_INET;
+            _remote_addr.ss_family = AF_INET;
+            break;
+        case NetIPv6:
+            _addr_len = sizeof(struct sockaddr_in6);
+            _self_addr.ss_family = AF_INET6;
+            _remote_addr.ss_family = AF_INET6;
+            break;
+        case NetLocal:
+            _addr_len = sizeof(struct sockaddr_un);
+            _self_addr.ss_family = AF_UNIX;
+            _remote_addr.ss_family = AF_UNIX;
+            break;
+
+        case NetUnknown:
+        default:
+            _status.set_app_errno(ERR_NETWORK_TYPE_ILLEGAL);
+            return _status;
+            break;
+    }
+
+    struct _EventArg *arg = (struct _EventArg *)malloc(sizeof(*arg));
+    if (NULL == arg) {
+        _clear();
+        _status.set_sys_errno();
+        return _status;
+    }
+
+    _clear();
+    _status.clear_err();
+
+    _event_arg = arg;
+    arg->client = this;
+    arg->libevent_what_ptr = _libevent_what_storage;
+    arg->coroutine = coroutine;
+    arg->user_arg = user_arg;
+
+    // create socket
+    _fd = socket(_self_addr.ss_family, SOCK_STREAM, 0);
+    if (_fd < 0) {
+        _status.set_sys_errno();
+        _clear();
+        return _status;
+    }
+
+    // non-block
+    set_fd_nonblock(_fd);
+
+    // create event
+    _owner_server = server;
+    _owner_base = server->owner();
+    _owner_base->put_event_under_control(this);
+    _event = event_new(_owner_base->event_base(), fd, EV_TIMEOUT | EV_READ, _libevent_callback, arg);
+    if (NULL == _event) {
+        ERROR("Failed to new a UDP event");
+        _clear();
+        _status.set_app_errno(ERR_EVENT_EVENT_NEW);
+        return _status;
+    }
+
+
+    // TODO:
+    return _status;
 }
 
 
 #endif  // end of __INIT_FUNCTIONS
+
+
+// ==========
+#define __MISC_FUNCTIONS
+#ifdef __MISC_FUNCTIONS
+
+NetType_t TCPItnlClient::network_type()
+{
+    switch(_self_addr.ss_family)
+    {
+        case AF_INET:
+            return NetIPv4;
+            break;
+        case AF_INET6:
+            return NetIPv6;
+            break;
+        case AF_UNIX:
+            return NetLocal;
+            break;
+        default:
+            return NetUnknown;
+            break;
+    }
+    return NetUnknown;
+}
+
+
+std::string TCPItnlClient::remote_addr()
+{
+    if (AF_INET == _remote_addr.ss_family)
+    {
+        struct sockaddr_in *addr = (struct sockaddr_in *)_remote_addr;
+        char c_addr_str[INET_ADDRSTRLEN + 1];
+        c_addr_str[INET_ADDRSTRLEN] = '\0';
+        inet_ntop(AF_INET, &(addr->sin_addr), c_addr_str, sizeof(c_addr_str));
+        return std::string(c_addr_str);
+    }
+    else if (AF_INET6 == _remote_addr.ss_family)
+    {
+        struct sockaddr_in6 *addr6 = (struct sockaddr_in6 *)_remote_addr;
+        char c_addr_str[INET6_ADDRSTRLEN + 1];
+        c_addr_str[INET6_ADDRSTRLEN] = '\0';
+        inet_ntop(AF_INET6, &(addr6->sin6_addr), c_addr_str, sizeof(c_addr_str));
+        return std::string(c_addr_str);
+    }
+    else if (AF_UNIX == _remote_addr.ss_family)
+    {
+        struct sockaddr_un *addr = (struct sockaddr_un *)_remote_addr;
+        return std::string(addr->sun_path);
+    }
+    else {
+        return "";
+    }
+}
+
+
+unsigned UDPItnlClient::remote_port()
+{
+    if (AF_INET == _remote_addr.ss_family)
+    {
+        struct sockaddr_in *addr = (struct sockaddr_in *)_remote_addr;
+        return (unsigned)ntohs(addr->sin_port);
+    }
+    else if (AF_INET6 == _remote_addr.ss_family)
+    {
+        struct sockaddr_in6 *addr6 = (struct sockaddr_in6 *)_remote_addr;
+        return (unsigned)ntohs(addr6->sin6_port);
+    }
+    else {
+        return 0;
+    }
+}
+
+
+void UDPItnlClient::copy_remote_addr(struct sockaddr *addr_out, socklen_t addr_len)
+{
+    if (NULL == addr_out || addr_len < _addr_len) {
+        return;
+    }
+    memcpy(addr_out, &_remote_addr, _addr_len);
+    return;
+}
+
+
+Server *UDPItnlClient::owner_server()
+{
+    return _server;
+}
+
+
+#endif  // __MISC_FUNCTIONS
+
+
+#ifdef __MACRO_NOT_EXIST
 
 
 // ==========
@@ -265,133 +419,7 @@ struct sockaddr *UDPItnlClient::_remote_addr()
 #endif  // end of __MISC_FUNCTIONS
 
 
-// ==========
-#define __INTERFACE_INIT
-#ifdef __INTERFACE_INIT
 
-struct Error UDPItnlClient::init(Server *server, struct stCoRoutine_t *coroutine, NetType_t network_type, void *user_arg)
-{
-    if (!(server && coroutine)) {
-        _status.set_app_errno(ERR_PARA_NULL);
-        return _status;
-    }
-
-    switch(network_type)
-    {
-        case NetIPv4:
-        case NetIPv6:
-        case NetLocal:
-            // OK
-            break;
-
-        case NetUnknown:
-        default:
-            // Illegal
-            _status.set_app_errno(ERR_NETWORK_TYPE_ILLEGAL);
-            return _status;
-            break;
-    }
-
-    _init();
-    _status.clear_err();
-
-    // create arguments and assign coroutine
-    int fd = 0;
-    struct sockaddr_in addr4;
-    struct sockaddr_in6 addr6;
-    struct sockaddr_un addrun;
-    struct sockaddr *addr = NULL;
-    socklen_t addr_len = 0;
-
-    struct _EventArg *arg = (struct _EventArg *)malloc(sizeof(*arg));
-    if (NULL == arg) {
-        _clear();
-        _status.set_sys_errno();
-        return _status;
-    }
-
-    _event_arg = arg;
-    arg->event = this;
-    arg->user_arg = user_arg;
-    arg->libevent_what_ptr = _libevent_what_storage;
-    arg->coroutine = coroutine;
-
-    // create file descriptor
-    if (NetIPv4 == network_type)
-    {
-        addr4.sin_family = AF_INET;
-        addr4.sin_port = 0;
-        addr4.sin_addr.s_addr = htonl(INADDR_ANY);
-
-        _fd_ipv4 = socket(AF_INET, SOCK_DGRAM, 0);
-        fd = _fd_ipv4;
-        addr = (struct sockaddr *)(&addr4);
-        addr_len = sizeof(addr4);
-    }
-    else if (NetIPv6 == network_type)
-    {
-        addr6.sin6_family = AF_INET6;
-        addr6.sin6_port = 0;
-        addr6.sin6_addr = in6addr_any;
-
-        _fd_ipv6 = socket(AF_INET6, SOCK_DGRAM, 0);
-        fd = _fd_ipv6;
-        addr = (struct sockaddr *)(&addr6);
-        addr_len = sizeof(addr6);
-    }
-    else    // NetLocal, AF_UNIX
-    {
-        addrun.sun_family = AF_UNIX;
-        _fd_unix = socket(AF_UNIX, SOCK_DGRAM, 0);
-        fd = _fd_unix;
-        addr = (struct sockaddr *)(&addrun);
-        addr_len = sizeof(addrun);
-    }
-
-    if (fd <= 0) {
-        _clear();
-        _status.set_sys_errno(errno);
-        return _status;
-    }
-    else {
-        _remote_addr_len = addr_len;
-        _fd = fd;
-    }
-
-    // try binding
-    int status = bind(fd, addr, addr_len);
-    if (status < 0) {
-        _clear();
-        _status.set_sys_errno(errno);
-        return _status;
-    }
-
-    // non-block
-    set_fd_nonblock(fd);
-
-    // create event
-    _owner_server = server;
-    _owner_base = server->owner();
-    _owner_base->put_event_under_control(this);
-    _event = event_new(_owner_base->event_base(), fd, EV_TIMEOUT | EV_READ, _libevent_callback, arg);
-    if (NULL == _event) {
-        ERROR("Failed to new a UDP event");
-        _clear();
-        _status.set_app_errno(ERR_EVENT_EVENT_NEW);
-        return _status;
-    }
-    else {
-        // Do NOT need to auto_free because auto_free is done in this class
-        // base->put_event_under_control(this);
-    }
-
-    // This event will not be added to base now. It will be done later in recv operations
-
-    // done
-    return _status;
-}
-
-#endif  // end of __INTERFACE_INIT
 
 
 // ==========
@@ -568,6 +596,6 @@ struct Error UDPItnlClient::recv_in_mimlisecs(void *data_out, const size_t len_l
 }
 
 #endif
-
+#endif
 
 // end of file

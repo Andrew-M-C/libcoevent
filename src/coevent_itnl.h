@@ -57,6 +57,7 @@ ssize_t recv_from(int sockfd, void *buf, size_t len, int flags, struct sockaddr 
 // libevent flag check
 BOOL event_is_timeout(uint32_t libevent_what);
 BOOL event_readable(uint32_t libevent_what);
+BOOL event_writable(uint32_t libevent_what);
 BOOL event_got_signal(uint32_t libevent_what);
 
 // struct sockaddr conversion
@@ -241,6 +242,55 @@ public:
 
     TCPServer *server();
     int file_descriptor();
+
+private:
+    void _clear();
+};
+
+
+// TCP client
+class TCPItnlClient : public TCPClient {
+protected:
+    void            *_event_arg;
+    int             _fd;
+    struct sockaddr_storage _self_addr;
+    struct sockaddr_storage _remote_addr;
+    socklen_t       _addr_len;
+
+    TCPServer       *_server;
+    uint32_t        *_libevent_what_storage;
+
+public:
+    TCPItnlClient();
+    virtual ~TCPItnlClient();
+
+    NetType_t network_type();
+
+    struct Error init(Server *server, struct stCoRoutine_t *coroutine, NetType_t network_type, void *user_arg = NULL);
+
+    struct Error connect(const struct sockaddr *addr, socklen_t addr_len, double timeout_seconds = 0);
+    struct Error connect(const std::string &target_address = "", unsigned target_port = 80, double timeout_seconds = 0);
+    struct Error connect(const char *target_address = "", unsigned target_port = 80, double timeout_seconds = 0);
+
+    struct Error connect_in_timeval(const struct sockaddr *addr, socklen_t addr_len, const struct timeval &timeout);
+    struct Error connect_in_timeval(const std::string &target_address, unsigned target_port, const struct timeval &timeout);
+    struct Error connect_in_timeval(const char *target_address, unsigned target_port, const struct timeval &timeout);
+
+    struct Error connect_in_mimlisecs(const struct sockaddr *addr, socklen_t addr_len, unsigned timeout_milisecs);
+    struct Error connect_in_mimlisecs(const std::string &target_address, unsigned target_port, unsigned timeout_milisecs);
+    struct Error connect_in_mimlisecs(const char *target_address, unsigned target_port, unsigned timeout_milisecs);
+
+    struct Error send(const void *data, const size_t data_len, size_t *send_len_out_nullable = NULL);
+
+    struct Error recv(void *data_out, const size_t len_limit, size_t *len_out_nullable, double timeout_seconds);
+    struct Error recv_in_timeval(void *data_out, const size_t len_limit, size_t *len_out_nullable, const struct timeval &timeout);
+    struct Error recv_in_mimlisecs(void *data_out, const size_t len_limit, size_t *len_out_nullable, unsigned timeout_milisecs);
+
+    std::string remote_addr();    // valid in IPv4 or IPv6 type
+    unsigned remote_port();       // valid in IPv4 or IPv6 type
+    void copy_remote_addr(struct sockaddr *addr_out, socklen_t addr_len);
+
+    Server *owner_server();
 
 private:
     void _clear();
