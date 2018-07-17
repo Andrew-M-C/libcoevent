@@ -36,6 +36,9 @@ struct _EventArg {
 static void _libevent_callback(evutil_socket_t fd, short what, void *libevent_arg)
 {
     struct _EventArg *arg = (struct _EventArg *)libevent_arg;
+    TCPItnlClient *client = arg->client;
+    Server *server = client->owner_server();
+    Base *base = client->owner();
 
     // switch into the coroutine
     if (arg->libevent_what_ptr) {
@@ -47,10 +50,6 @@ static void _libevent_callback(evutil_socket_t fd, short what, void *libevent_ar
     // is coroutine end?
     if (is_coroutine_end(arg->coroutine)) {
         // delete the event if this is under control of the base
-        TCPItnlClient *client = arg->client;
-        Server *server = client->owner_server();
-        Base *base = client->owner();
-
         DEBUG("Server %s ends", server->identifier().c_str());
         base->delete_event_under_control(server);
     }
@@ -122,13 +121,12 @@ void TCPItnlClient::_clear()
         _fd = 0;
     }
 
-    _event_arg = NULL;
     _fd = 0;
     _self_addr.ss_family = 0;
     _remote_addr.ss_family = 0;
     _addr_len = 0;
     _is_connected = FALSE;
-    _owner_server = NULL;
+    DEBUG("%s cleared", identifier().c_str());
     return;
 }
 
@@ -148,6 +146,8 @@ struct Error TCPItnlClient::init(Server *server, struct stCoRoutine_t *coroutine
 
     _clear();
     _status.clear_err();
+    _owner_server = server;
+    _owner_base = server->owner();
 
     switch(network_type)
     {
@@ -217,8 +217,6 @@ struct Error TCPItnlClient::init(Server *server, struct stCoRoutine_t *coroutine
     set_fd_nonblock(_fd);
 
     // create event
-    _owner_server = server;
-    _owner_base = server->owner();
     _owner_base->put_event_under_control(this);
     _event = event_new(_owner_base->event_base(), _fd, EV_TIMEOUT | EV_READ, _libevent_callback, arg);
     if (NULL == _event) {

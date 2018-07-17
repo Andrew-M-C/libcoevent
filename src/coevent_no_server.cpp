@@ -97,6 +97,20 @@ NoServer::~NoServer()
 {
     DEBUG("Delete 'NO' server");
     this->_clear();
+
+    if (_event_arg) {
+        struct _EventArg *arg = (struct _EventArg *)_event_arg;
+        _event_arg = NULL;
+
+        if (arg->coroutine) {
+            DEBUG("remove coroutine");
+            co_release(arg->coroutine);
+            arg->coroutine = NULL;
+        }
+
+        DEBUG("Delete _event_arg");
+        delete arg;
+    }
     return;
 }
 
@@ -118,20 +132,6 @@ void NoServer::_clear()
         DEBUG("Delete evtimer");
         evtimer_del(_event);
         _event = NULL;
-    }
-
-    if (_event_arg) {
-        struct _EventArg *arg = (struct _EventArg *)_event_arg;
-        _event_arg = NULL;
-
-        if (arg->coroutine) {
-            DEBUG("remove coroutine");
-            co_release(arg->coroutine);
-            arg->coroutine = NULL;
-        }
-
-        DEBUG("Delete _event_arg");
-        delete arg;
     }
 
     return;

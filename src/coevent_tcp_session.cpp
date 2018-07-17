@@ -115,6 +115,15 @@ TCPItnlSession::~TCPItnlSession()
 {
     _clear();
 
+    struct _EventArg *arg = (struct _EventArg *)_event_arg;
+    if (arg) {
+        if (arg->coroutine) {
+            co_release(arg->coroutine);
+        }
+        free(arg);
+        _event_arg = NULL;
+    }
+
     if (_libevent_what_storage) {
         free(_libevent_what_storage);
         _libevent_what_storage = NULL;
@@ -125,15 +134,6 @@ TCPItnlSession::~TCPItnlSession()
 
 void TCPItnlSession::_clear()
 {
-    struct _EventArg *arg = (struct _EventArg *)_event_arg;
-    if (arg) {
-        if (arg->coroutine) {
-            co_release(arg->coroutine);
-        }
-        free(arg);
-        _event_arg = NULL;
-    }
-
     if (_event) {
         event_del(_event);
         _event = NULL;
@@ -147,7 +147,6 @@ void TCPItnlSession::_clear()
     _remote_addr.ss_family = (sa_family_t)0;
     _addr_len = 0;
     _server = NULL;
-    _event_arg = NULL;
     return;
 }
 

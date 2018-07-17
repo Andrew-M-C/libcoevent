@@ -447,6 +447,35 @@ void UDPServer::_clear()
         _event = NULL;
     }
 
+    if (_fd_ipv4) {
+        close(_fd_ipv4);
+    }
+    if (_fd_ipv6) {
+        close(_fd_ipv6);
+    }
+    if (_fd_unix) {
+        close(_fd_unix);
+    }
+
+    _fd_ipv4 = 0;
+    _fd_ipv6 = 0;
+    _fd_unix = 0;
+    return;
+}
+
+
+UDPServer::UDPServer()
+{
+    _init();
+    return;
+}
+
+
+UDPServer::~UDPServer()
+{
+    DEBUG("Delete UDP server %s", _identifier.c_str());
+    _clear();
+
     if (_event_arg) {
         struct _EventArg *arg = (struct _EventArg *)_event_arg;
         _event_arg = NULL;
@@ -469,36 +498,6 @@ void UDPServer::_clear()
         DEBUG("Delete _event_arg");
         delete arg;
     }
-
-    if (_fd_ipv4) {
-        close(_fd_ipv4);
-    }
-    if (_fd_ipv6) {
-        close(_fd_ipv6);
-    }
-    if (_fd_unix) {
-        close(_fd_unix);
-    }
-
-    _event_arg = NULL;
-    _fd_ipv4 = 0;
-    _fd_ipv6 = 0;
-    _fd_unix = 0;
-    return;
-}
-
-
-UDPServer::UDPServer()
-{
-    _init();
-    return;
-}
-
-
-UDPServer::~UDPServer()
-{
-    DEBUG("Delete UDP server %s", _identifier.c_str());
-    _clear();
 
     if (_libevent_what_storage) {
         free(_libevent_what_storage);

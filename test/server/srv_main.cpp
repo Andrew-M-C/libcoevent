@@ -225,7 +225,7 @@ static void _simple_test_routine(evutil_socket_t fd, Event *abs_server, void *ar
     {
         TCPClient *tcp = routine->new_TCP_client(NetIPv4);
         if (NULL == tcp) {
-            LOG("Cannot get TCP client");
+            LOG("Failed to get TCP client");
             return;
         }
 

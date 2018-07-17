@@ -113,11 +113,6 @@ void TCPServer::_clear()
         _event = NULL;
     }
 
-    if (_event_arg) {
-        free(_event_arg);
-        _event_arg = NULL;
-    }
-
     for (std::map<int, TCPSession *>::iterator each_session = _sessions.begin();
         each_session != _sessions.end();
         each_session ++)
@@ -156,6 +151,12 @@ TCPServer::TCPServer()
 TCPServer::~TCPServer()
 {
     _clear();
+
+    if (_event_arg) {
+        free(_event_arg);
+        _event_arg = NULL;
+    }
+
     return;
 }
 

@@ -118,6 +118,20 @@ UDPItnlSession::~UDPItnlSession()
 {
     _clear();
 
+    if (_event_arg) {
+        struct _EventArg *arg = (struct _EventArg *)_event_arg;
+        _event_arg = NULL;
+
+        if (arg->coroutine) {
+            DEBUG("remove coroutine");
+            co_release(arg->coroutine);
+            arg->coroutine = NULL;
+        }
+
+        DEBUG("Delete _event_arg");
+        free(arg);
+    }
+
     if (_libevent_what_storage) {
         free(_libevent_what_storage);
         _libevent_what_storage = NULL;
@@ -132,20 +146,6 @@ void UDPItnlSession::_clear()
         DEBUG("Delete IO event");
         event_del(_event);
         _event = NULL;
-    }
-
-    if (_event_arg) {
-        struct _EventArg *arg = (struct _EventArg *)_event_arg;
-        _event_arg = NULL;
-
-        if (arg->coroutine) {
-            DEBUG("remove coroutine");
-            co_release(arg->coroutine);
-            arg->coroutine = NULL;
-        }
-
-        DEBUG("Delete _event_arg");
-        free(arg);
     }
 
     if (_fd > 0) {
