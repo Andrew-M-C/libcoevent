@@ -141,6 +141,7 @@ public:
 
     // misc functions
     const DNSResult *dns_result(const std::string &domain_name);
+    std::string quick_resolve(const std::string &domain_name, double timeout_seconds = 0, const std::string &dns_server_ip = "");
     Server *owner_server();
 
     // remote addr

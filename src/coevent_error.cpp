@@ -34,6 +34,7 @@ const char *g_error_msg_list[] = {
     "object is not initialized",
     "object not found",
     "client already connected",
+    "client not connected",
 
     "cannot find approperate DNS server IP",
 

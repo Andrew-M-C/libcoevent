@@ -187,8 +187,48 @@ static void _tcp_session_routine(evutil_socket_t fd, Event *abs_server, void *ar
     return;
 }
 
-
 #endif
+
+
+// ==========
+#define __SIMPLE_TEST_ROUTINE
+#ifdef __SIMPLE_TEST_ROUTINE
+
+static void _simple_test_routine(evutil_socket_t fd, Event *abs_server, void *arg)
+{
+    NoServer *routine = (NoServer *)abs_server;
+    std::string server_address;
+
+    LOG("Routine starts");
+    routine->sleep(1.0);
+    LOG("Routine awake");
+
+    // do DNS request
+    {
+        DNSClient *dns_client = routine->new_DNS_client(NetIPv4);
+        if (NULL == dns_client) {
+            LOG("Cannot get DNS client");
+            return;
+        }
+
+        const char *domain_name = "www.ccb.com";
+        server_address = dns_client->quick_resolve(domain_name, 5.0);
+        if (0 == server_address.length()) {
+            LOG("Failed to resolve domain address");
+            return;
+        }
+
+        LOG("IP address for %s: %s", domain_name, server_address.c_str());
+        routine->delete_client(dns_client);
+    }
+
+    routine->sleep(1.0);
+    LOG("Test routine ends");
+    return;
+}
+
+
+#endif  // end of __SIMPLE_TEST_ROUTINE
 
 // ==========
 #define __MAIN
@@ -200,6 +240,7 @@ int main(int argc, char *argv[])
     Error status;
     UDPServer *server_A = new UDPServer;
     TCPServer *server_B = new TCPServer;
+    NoServer *dummy_server = new NoServer;
     LOG("Hello, libcoevent! Base: %s", base->identifier().c_str());
 
     status = server_A->init_session_mode(base, _udp_session_routine, NetIPv4, _UDP_PORT, server_A);
@@ -211,6 +252,12 @@ int main(int argc, char *argv[])
     status = server_B->init_session_mode(base, _tcp_session_routine, NetIPv4, _TCP_PORT, server_B);
     if (FALSE == status.is_ok()) {
         LOG("Init TCP server failed: %s", status.c_err_msg());
+        goto END;
+    }
+
+    status = dummy_server->init(base, _simple_test_routine);
+    if (FALSE == status.is_ok()) {
+        LOG("Init test routine failed: %s", status.c_err_msg());
         goto END;
     }
 

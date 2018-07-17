@@ -232,6 +232,33 @@ const DNSResult *DNSItnlClient::dns_result(const std::string &domain_name)
 }
 
 
+std::string DNSItnlClient::quick_resolve(const std::string &domain_name, double timeout_seconds, const std::string &dns_server_ip)
+{
+    std::string result;
+    resolve(domain_name, timeout_seconds, dns_server_ip);
+    if (_status.is_error()) {
+        return result;
+    }
+
+    const DNSResult *dns_result_item = dns_result(domain_name);
+    if (NULL == dns_result_item) {
+        return result;
+    }
+
+    for (size_t index = 0; index < dns_result_item->resource_record_count(); index ++)
+    {
+        const DNSResourceRecord *rr = dns_result_item->resource_record(index);
+        if (DnsRRType_IPv4Addr == rr->record_type())
+        {
+            result.assign(rr->record_address());
+            break;
+        }
+    }
+
+    return result;
+}
+
+
 Server *DNSItnlClient::owner_server()
 {
     if (_udp_client) {

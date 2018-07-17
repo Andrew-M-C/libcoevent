@@ -23,9 +23,17 @@ UDPClient *Server::new_UDP_client(NetType_t network_type, void *user_arg)
     if (NULL == _coroutine()) {
         return NULL;
     }
+
     UDPItnlClient *client = new UDPItnlClient;
-    client->init(this, _coroutine(), network_type, user_arg);
-    _client_chain.insert(client);
+    Error status = client->init(this, _coroutine(), network_type, user_arg);
+
+    if (status.is_ok()) {
+        _client_chain.insert(client);
+    }
+    else {
+        delete client;
+        client = NULL;
+    }
     return (UDPClient *)client;
 }
 
@@ -35,10 +43,38 @@ DNSClient *Server::new_DNS_client(NetType_t network_type, void *user_arg)
     if (NULL == _coroutine()) {
         return NULL;
     }
+
     DNSItnlClient *client = new DNSItnlClient;
-    client->init(this, _coroutine(), network_type, user_arg);
-    _client_chain.insert(client);
+    Error status = client->init(this, _coroutine(), network_type, user_arg);
+
+    if (status.is_ok()) {
+        _client_chain.insert(client);
+    }
+    else {
+        delete client;
+        client = NULL;
+    }
     return (DNSClient *)client;
+}
+
+
+TCPClient *Server::new_TCP_client(NetType_t network_type, void *user_arg)
+{
+    if (NULL == _coroutine()) {
+        return NULL;
+    }
+
+    TCPItnlClient *client = new TCPItnlClient;
+    Error status = client->init(this, _coroutine(), network_type, user_arg);
+
+    if (status.is_ok()) {
+        _client_chain.insert(client);
+    }
+    else {
+        delete client;
+        client = NULL;
+    }
+    return (TCPClient *)client;
 }
 
 

@@ -498,4 +498,51 @@ struct Error TCPItnlClient::connect_in_mimlisecs(const char *target_address, uns
 
 #endif      // end of __TCP_CONNECT_FUNCTION
 
+
+// ==========
+#define __SEND_FUNCTION
+#ifdef __SEND_FUNCTION
+
+struct Error TCPItnlClient::send(const void *data, const size_t data_len, size_t *send_len_out_nullable)
+{
+    // TODO:
+    return _status;
+}
+
+
+#endif  // end of __SEND_FUNCTION
+
+
+// ==========
+#define __RECV_FUNCTIONS
+#ifdef __RECV_FUNCTIONS
+
+struct Error TCPItnlClient::recv_in_timeval(void *data_out, const size_t len_limit, size_t *len_out, const struct timeval &timeout)
+{
+    if (FALSE == _is_connected) {
+        _status.set_app_errno(ERR_NOT_CONNECTED);
+        return _status;
+    }
+
+    // TODO:
+    return _status;
+}
+
+
+struct Error TCPItnlClient::recv(void *data_out, const size_t len_limit, size_t *len_out, double timeout_seconds)
+{
+    struct timeval timeout;
+    timeout = to_timeval(timeout_seconds);
+    return recv_in_timeval(data_out, len_limit, len_out, timeout);
+}
+
+struct Error TCPItnlClient::recv_in_mimlisecs(void *data_out, const size_t len_limit, size_t *len_out, unsigned timeout_milisecs)
+{
+    struct timeval timeout;
+    timeout = to_timeval_from_milisecs(timeout_milisecs);
+    return recv_in_timeval(data_out, len_limit, len_out, timeout);
+}
+
+#endif  // end of __RECV_FUNCTIONS
+
 // end of file

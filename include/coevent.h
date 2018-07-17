@@ -151,6 +151,7 @@ protected:
 
 // abstract event of clients
 // Client classes should ONLY been instantiated by Server objects 
+// should NOT invoke delete to clients!!!
 class Client : public Event {
 public:
     Client(){};
@@ -315,6 +316,7 @@ public:
     virtual std::string default_dns_server(size_t index = 0, NetType_t *network_type_out = NULL) = 0;
 
     virtual const DNSResult *dns_result(const std::string &domain_name) = 0;
+    virtual std::string quick_resolve(const std::string &domain_name, double timeout_seconds = 0, const std::string &dns_server_ip = "") = 0;
 };
 
 
@@ -436,11 +438,11 @@ public:
     virtual struct Error connect_to_server(const std::string &target_address = "", unsigned target_port = 80, double timeout_seconds = 0) = 0;
     virtual struct Error connect_to_server(const char *target_address = "", unsigned target_port = 80, double timeout_seconds = 0) = 0;
 
-    virtual struct Error connect_in_timeval(const struct sockaddr *addr, socklen_t addr_len, const struct timeval &timeout);
+    virtual struct Error connect_in_timeval(const struct sockaddr *addr, socklen_t addr_len, const struct timeval &timeout) = 0;
     virtual struct Error connect_in_timeval(const std::string &target_address, unsigned target_port, const struct timeval &timeout) = 0;
     virtual struct Error connect_in_timeval(const char *target_address, unsigned target_port, const struct timeval &timeout) = 0;
 
-    virtual struct Error connect_in_mimlisecs(const struct sockaddr *addr, socklen_t addr_len, unsigned timeout_milisecs);
+    virtual struct Error connect_in_mimlisecs(const struct sockaddr *addr, socklen_t addr_len, unsigned timeout_milisecs) = 0;
     virtual struct Error connect_in_mimlisecs(const std::string &target_address, unsigned target_port, unsigned timeout_milisecs) = 0;
     virtual struct Error connect_in_mimlisecs(const char *target_address, unsigned target_port, unsigned timeout_milisecs) = 0;
 
