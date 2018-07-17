@@ -548,7 +548,7 @@ struct Error UDPItnlClient::recv_in_timeval(void *data_out, const size_t len_lim
             _status.set_app_errno(ERR_TIMEOUT);
         }
         else {
-            ERROR("unrecognized event flag: 0x%04u", libevent_what);
+            ERROR("unrecognized event flag: 0x%04u", (unsigned)libevent_what);
             _status.set_app_errno(ERR_UNKNOWN);
         }
     }

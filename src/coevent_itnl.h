@@ -256,8 +256,9 @@ protected:
     struct sockaddr_storage _self_addr;
     struct sockaddr_storage _remote_addr;
     socklen_t       _addr_len;
+    BOOL            _is_connected;
 
-    TCPServer       *_server;
+    Server          *_owner_server;
     uint32_t        *_libevent_what_storage;
 
 public:
@@ -268,9 +269,9 @@ public:
 
     struct Error init(Server *server, struct stCoRoutine_t *coroutine, NetType_t network_type, void *user_arg = NULL);
 
-    struct Error connect(const struct sockaddr *addr, socklen_t addr_len, double timeout_seconds = 0);
-    struct Error connect(const std::string &target_address = "", unsigned target_port = 80, double timeout_seconds = 0);
-    struct Error connect(const char *target_address = "", unsigned target_port = 80, double timeout_seconds = 0);
+    struct Error connect_with_server(const struct sockaddr *addr, socklen_t addr_len, double timeout_seconds = 0);
+    struct Error connect_with_server(const std::string &target_address = "", unsigned target_port = 80, double timeout_seconds = 0);
+    struct Error connect_with_server(const char *target_address = "", unsigned target_port = 80, double timeout_seconds = 0);
 
     struct Error connect_in_timeval(const struct sockaddr *addr, socklen_t addr_len, const struct timeval &timeout);
     struct Error connect_in_timeval(const std::string &target_address, unsigned target_port, const struct timeval &timeout);
