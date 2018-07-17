@@ -88,7 +88,7 @@ const std::string &Base::identifier()
 
 void Base::put_event_under_control(Event *event)
 {
-    DEBUG("Request handle event %p", event)
+    DEBUG("Request handle event %p", event);
     _events_under_control.insert(event);
     return;
 }

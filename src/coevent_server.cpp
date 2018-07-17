@@ -31,6 +31,7 @@ UDPClient *Server::new_UDP_client(NetType_t network_type, void *user_arg)
         _client_chain.insert(client);
     }
     else {
+        ERROR("Failed to init UDP client: %s", status.c_err_msg());
         delete client;
         client = NULL;
     }
@@ -51,6 +52,7 @@ DNSClient *Server::new_DNS_client(NetType_t network_type, void *user_arg)
         _client_chain.insert(client);
     }
     else {
+        ERROR("Failed to init DNS client: %s", status.c_err_msg());
         delete client;
         client = NULL;
     }
@@ -71,6 +73,7 @@ TCPClient *Server::new_TCP_client(NetType_t network_type, void *user_arg)
         _client_chain.insert(client);
     }
     else {
+        ERROR("Failed to init TCP client: %s", status.c_err_msg());
         delete client;
         client = NULL;
     }

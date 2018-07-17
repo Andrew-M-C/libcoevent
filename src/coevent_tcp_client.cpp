@@ -3,6 +3,7 @@
 #include "coevent_itnl.h"
 #include <string.h>
 #include <string>
+#include <errno.h>
 #include <sys/types.h>
 #include <sys/socket.h>
 #include <unistd.h>
@@ -79,7 +80,7 @@ TCPItnlClient::TCPItnlClient()
     _is_connected = FALSE;
     _owner_server = NULL;
 
-    _libevent_what_storage = (uint32_t *)malloc(*_libevent_what_storage);
+    _libevent_what_storage = (uint32_t *)malloc(sizeof(*_libevent_what_storage));
     if (NULL == _libevent_what_storage) {
         _clear();
         _status.set_sys_errno();
@@ -145,23 +146,36 @@ struct Error TCPItnlClient::init(Server *server, struct stCoRoutine_t *coroutine
         return _status;
     }
 
+    _clear();
+    _status.clear_err();
+
     switch(network_type)
     {
-        case NetIPv4:
+        case NetIPv4: {
+            struct sockaddr_in *addr4 = (struct sockaddr_in *)&_self_addr;
             _addr_len = sizeof(struct sockaddr_in);
             _self_addr.ss_family = AF_INET;
             _remote_addr.ss_family = AF_INET;
-            break;
-        case NetIPv6:
+
+            addr4->sin_port = 0;
+            addr4->sin_addr.s_addr = htonl(INADDR_ANY);
+            }break;
+
+        case NetIPv6: {
+            struct sockaddr_in6 *addr6 = (struct sockaddr_in6 *)&_self_addr;
             _addr_len = sizeof(struct sockaddr_in6);
             _self_addr.ss_family = AF_INET6;
             _remote_addr.ss_family = AF_INET6;
-            break;
-        case NetLocal:
+
+            addr6->sin6_port = 0;
+            addr6->sin6_addr = in6addr_any;
+            }break;
+
+        case NetLocal: {
             _addr_len = sizeof(struct sockaddr_un);
             _self_addr.ss_family = AF_UNIX;
             _remote_addr.ss_family = AF_UNIX;
-            break;
+            }break;
 
         case NetUnknown:
         default:
@@ -176,9 +190,6 @@ struct Error TCPItnlClient::init(Server *server, struct stCoRoutine_t *coroutine
         _status.set_sys_errno();
         return _status;
     }
-
-    _clear();
-    _status.clear_err();
 
     _event_arg = arg;
     arg->client = this;
@@ -320,6 +331,7 @@ Server *TCPItnlClient::owner_server()
 #ifdef __TCP_CONNECT_FUNCTION
 
 // reference: [Linux socket非阻塞connect方法（一）](https://blog.csdn.net/nphyez/article/details/10268723)
+// reference: [非阻塞connect编写方法介绍](http://dongxicheng.org/network/non-block-connect-implemention/)
 struct Error TCPItnlClient::connect_in_timeval(const struct sockaddr *addr, socklen_t addr_len, const struct timeval &timeout)
 {
     // para and instance status check
@@ -357,6 +369,7 @@ struct Error TCPItnlClient::connect_in_timeval(const struct sockaddr *addr, sock
     }
     else {
         if (EINPROGRESS == errno) {
+            DEBUG("EINPROGRESS");
             should_enter_libevent = TRUE;
         } else {
             _status.set_sys_errno();
@@ -393,6 +406,7 @@ struct Error TCPItnlClient::connect_in_timeval(const struct sockaddr *addr, sock
         }
         else if (event_writable(libevent_what) || event_readable(libevent_what))
         {
+#if 0
             // check status, valid in Linux ONLY
             connect(_fd, addr, addr_len);
             int err_copy = errno;
@@ -405,6 +419,25 @@ struct Error TCPItnlClient::connect_in_timeval(const struct sockaddr *addr, sock
                 DEBUG("Failed to connect via libevent: %s", strerror(err_copy));
                 _status.set_sys_errno(err_copy);
             }
+#else
+            int err = 0;
+            socklen_t errlen = sizeof(err);
+            conn_stat = getsockopt(_fd, SOL_SOCKET, SO_ERROR, &err, &errlen);
+            if (conn_stat < 0) {
+                _status.set_sys_errno();
+                ERROR("Failed in getsockopt: %s", strerror(errno));
+            }
+            else {
+                if (0 == err) {
+                    DEBUG("Connect TCP via libevent successed");
+                    _status.clear_err();
+                }
+                else {
+                    DEBUG("Failed to connect via libevent: %d", err);
+                    _status.set_sys_errno(err);
+                }
+            }
+#endif
         }
         else {
             ERROR("unrecognized event flag: 0x%04u", (unsigned)libevent_what);

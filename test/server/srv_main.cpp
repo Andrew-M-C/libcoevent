@@ -198,10 +198,9 @@ static void _simple_test_routine(evutil_socket_t fd, Event *abs_server, void *ar
 {
     NoServer *routine = (NoServer *)abs_server;
     std::string server_address;
+    Error status;
 
     LOG("Routine starts");
-    routine->sleep(1.0);
-    LOG("Routine awake");
 
     // do DNS request
     {
@@ -211,7 +210,7 @@ static void _simple_test_routine(evutil_socket_t fd, Event *abs_server, void *ar
             return;
         }
 
-        const char *domain_name = "www.ccb.com";
+        const char *domain_name = "www.sysu.edu.cn";
         server_address = dns_client->quick_resolve(domain_name, 5.0);
         if (0 == server_address.length()) {
             LOG("Failed to resolve domain address");
@@ -220,6 +219,24 @@ static void _simple_test_routine(evutil_socket_t fd, Event *abs_server, void *ar
 
         LOG("IP address for %s: %s", domain_name, server_address.c_str());
         routine->delete_client(dns_client);
+    }
+
+    // do connect
+    {
+        TCPClient *tcp = routine->new_TCP_client(NetIPv4);
+        if (NULL == tcp) {
+            LOG("Cannot get TCP client");
+            return;
+        }
+
+        status = tcp->connect_to_server(server_address, 80, 5.0);
+        if (status.is_error()) {
+            LOG("Failed to connect to server: %s", status.c_err_msg());
+            return;
+        }
+
+        LOG("Connect success");
+        routine->delete_client(tcp);
     }
 
     routine->sleep(1.0);
