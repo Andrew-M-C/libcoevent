@@ -421,6 +421,81 @@ struct Error TCPItnlClient::connect_in_timeval(const struct sockaddr *addr, sock
     return _status;
 }
 
+
+struct Error TCPItnlClient::connect_in_timeval(const std::string &target_address, unsigned target_port, const struct timeval &timeout)
+{
+    if (NetIPv4 == network_type()) {
+        struct sockaddr_in addr;
+        convert_str_to_sockaddr_in(target_address, target_port, &addr);
+        return connect_in_timeval((struct sockaddr *)&addr, sizeof(addr), timeout);
+    }
+    else {
+        struct sockaddr_in6 addr6;
+        convert_str_to_sockaddr_in6(target_address, target_port, &addr6);
+        return connect_in_timeval((struct sockaddr *)&addr6, sizeof(addr6), timeout);
+    }
+}
+
+
+struct Error TCPItnlClient::connect_in_timeval(const char *target_address, unsigned target_port, const struct timeval &timeout)
+{
+    if (NULL == target_address) {
+        _status.set_app_errno(ERR_PARA_NULL);
+        return _status;
+    }
+
+    return connect_in_timeval(std::string(target_address), target_port, timeout);
+}
+
+
+struct Error TCPItnlClient::connect_to_server(const struct sockaddr *addr, socklen_t addr_len, double timeout_seconds)
+{
+    struct timeval timeout;
+    timeout = to_timeval(timeout_seconds);
+    return connect_in_timeval(addr, addr_len, timeout);
+}
+
+
+struct Error TCPItnlClient::connect_to_server(const std::string &target_address, unsigned target_port, double timeout_seconds)
+{
+    struct timeval timeout;
+    timeout = to_timeval(timeout_seconds);
+    return connect_in_timeval(target_address, target_port, timeout);
+}
+
+
+struct Error TCPItnlClient::connect_to_server(const char *target_address, unsigned target_port, double timeout_seconds)
+{
+    struct timeval timeout;
+    timeout = to_timeval(timeout_seconds);
+    return connect_in_timeval(target_address, target_port, timeout);
+}
+
+
+struct Error TCPItnlClient::connect_in_mimlisecs(const struct sockaddr *addr, socklen_t addr_len, unsigned timeout_milisecs)
+{
+    struct timeval timeout;
+    timeout = to_timeval_from_milisecs(timeout_milisecs);
+    return connect_in_timeval(addr, addr_len, timeout);
+}
+
+
+struct Error TCPItnlClient::connect_in_mimlisecs(const std::string &target_address, unsigned target_port, unsigned timeout_milisecs)
+{
+    struct timeval timeout;
+    timeout = to_timeval_from_milisecs(timeout_milisecs);
+    return connect_in_timeval(target_address, target_port, timeout);
+}
+
+
+struct Error TCPItnlClient::connect_in_mimlisecs(const char *target_address, unsigned target_port, unsigned timeout_milisecs)
+{
+    struct timeval timeout;
+    timeout = to_timeval_from_milisecs(timeout_milisecs);
+    return connect_in_timeval(target_address, target_port, timeout);
+}
+
+
 #endif      // end of __TCP_CONNECT_FUNCTION
 
 // end of file

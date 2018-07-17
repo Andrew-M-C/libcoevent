@@ -432,9 +432,9 @@ public:
 
     virtual NetType_t network_type() = 0;
 
-    virtual struct Error connect_with_server(const struct sockaddr *addr, socklen_t addr_len, double timeout_seconds = 0) = 0;
-    virtual struct Error connect_with_server(const std::string &target_address = "", unsigned target_port = 80, double timeout_seconds = 0) = 0;
-    virtual struct Error connect_with_server(const char *target_address = "", unsigned target_port = 80, double timeout_seconds = 0) = 0;
+    virtual struct Error connect_to_server(const struct sockaddr *addr, socklen_t addr_len, double timeout_seconds = 0) = 0;
+    virtual struct Error connect_to_server(const std::string &target_address = "", unsigned target_port = 80, double timeout_seconds = 0) = 0;
+    virtual struct Error connect_to_server(const char *target_address = "", unsigned target_port = 80, double timeout_seconds = 0) = 0;
 
     virtual struct Error connect_in_timeval(const struct sockaddr *addr, socklen_t addr_len, const struct timeval &timeout);
     virtual struct Error connect_in_timeval(const std::string &target_address, unsigned target_port, const struct timeval &timeout) = 0;
