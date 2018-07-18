@@ -203,6 +203,8 @@ protected:
     struct sockaddr_un  _remote_addr_unix;
     socklen_t           _remote_addr_unix_len;
 
+    std::map<std::string, UDPSession *> _session_collection;
+
 public:
     UDPServer();
     virtual ~UDPServer();
