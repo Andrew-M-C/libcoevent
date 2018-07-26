@@ -83,13 +83,13 @@ protected:
     struct sockaddr_in6 _remote_addr_ipv6;
     struct sockaddr_un  _remote_addr_unix;
     socklen_t       _remote_addr_len;
-    Server          *_owner_server;
+    Procedure       *_owner_server;
 
 public:
     UDPItnlClient();
     virtual ~UDPItnlClient();
 
-    struct Error init(Server *server, struct stCoRoutine_t *coroutine, NetType_t network_type, void *user_arg = NULL);
+    struct Error init(Procedure *server, struct stCoRoutine_t *coroutine, NetType_t network_type, void *user_arg = NULL);
     NetType_t network_type();
 
     struct Error send(const void *data, const size_t data_len, size_t *send_len_out_nullable, const struct sockaddr *addr, socklen_t addr_len);
@@ -107,7 +107,7 @@ public:
     unsigned remote_port();       // valid in IPv4 or IPv6 type
     void copy_remote_addr(struct sockaddr *addr_out, socklen_t addr_len);
 
-    Server *owner_server();
+    Procedure *owner_server();
 
 private:
     void _init();
@@ -128,7 +128,7 @@ public:
     // construct and descruct functions
     DNSItnlClient();
     virtual ~DNSItnlClient();
-    struct Error init(Server *server, struct stCoRoutine_t *coroutine, NetType_t network_type, void *user_arg = NULL);
+    struct Error init(Procedure *server, struct stCoRoutine_t *coroutine, NetType_t network_type, void *user_arg = NULL);
 
     // send and receive DNS request
     NetType_t network_type();
@@ -142,7 +142,7 @@ public:
     // misc functions
     const DNSResult *dns_result(const std::string &domain_name);
     std::string quick_resolve(const std::string &domain_name, double timeout_seconds = 0, const std::string &dns_server_ip = "");
-    Server *owner_server();
+    Procedure *owner_server();
 
     // remote addr
     std::string remote_addr();    // valid in IPv4 or IPv6 type
@@ -259,7 +259,7 @@ protected:
     socklen_t       _addr_len;
     BOOL            _is_connected;
 
-    Server          *_owner_server;
+    Procedure       *_owner_server;
     uint32_t        *_libevent_what_storage;
 
 public:
@@ -268,7 +268,7 @@ public:
 
     NetType_t network_type();
 
-    struct Error init(Server *server, struct stCoRoutine_t *coroutine, NetType_t network_type, void *user_arg = NULL);
+    struct Error init(Procedure *server, struct stCoRoutine_t *coroutine, NetType_t network_type, void *user_arg = NULL);
 
     struct Error connect_to_server(const struct sockaddr *addr, socklen_t addr_len, double timeout_seconds = 0);
     struct Error connect_to_server(const std::string &target_address = "", unsigned target_port = 80, double timeout_seconds = 0);
@@ -292,7 +292,7 @@ public:
     unsigned remote_port();       // valid in IPv4 or IPv6 type
     void copy_remote_addr(struct sockaddr *addr_out, socklen_t addr_len);
 
-    Server *owner_server();
+    Procedure *owner_server();
 
 private:
     void _clear();

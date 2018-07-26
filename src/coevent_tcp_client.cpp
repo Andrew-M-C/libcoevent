@@ -37,7 +37,7 @@ static void _libevent_callback(evutil_socket_t fd, short what, void *libevent_ar
 {
     struct _EventArg *arg = (struct _EventArg *)libevent_arg;
     TCPItnlClient *client = arg->client;
-    Server *server = client->owner_server();
+    Procedure *server = client->owner_server();
     Base *base = client->owner();
 
     // switch into the coroutine
@@ -137,7 +137,7 @@ void TCPItnlClient::_clear()
 #define __INIT_FUNCTIONS
 #ifdef __INIT_FUNCTIONS
 
-struct Error TCPItnlClient::init(Server *server, struct stCoRoutine_t *coroutine, NetType_t network_type, void *user_arg)
+struct Error TCPItnlClient::init(Procedure *server, struct stCoRoutine_t *coroutine, NetType_t network_type, void *user_arg)
 {
     if (!(server && coroutine)) {
         _status.set_app_errno(ERR_PARA_NULL);
@@ -315,7 +315,7 @@ void TCPItnlClient::copy_remote_addr(struct sockaddr *addr_out, socklen_t addr_l
 }
 
 
-Server *TCPItnlClient::owner_server()
+Procedure *TCPItnlClient::owner_server()
 {
     return _owner_server;
 }

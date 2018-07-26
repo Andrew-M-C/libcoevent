@@ -135,17 +135,51 @@ public:
 
 
 // abstract event of servers
-class Server : public Event {
+class Procedure : public Event {
 protected:
     std::set<Client *>  _client_chain;
 public:
-    virtual ~Server();
+    virtual ~Procedure();
     struct Error delete_client(Client *client);
     UDPClient *new_UDP_client(NetType_t network_type, void *user_arg = NULL);
     DNSClient *new_DNS_client(NetType_t network_type, void *user_arg = NULL);
     TCPClient *new_TCP_client(NetType_t network_type, void *user_arg = NULL);
 protected:
     virtual struct stCoRoutine_t *_coroutine();
+};
+
+
+class Server : public Procedure {
+public:
+    Server(){};
+    virtual ~Server(){};
+};
+
+class Session : public Procedure {
+public:
+    Session(){}
+    virtual ~Session(){};
+};
+
+
+// ====================
+// pure event, no network interfaces supported
+class SubRoutine : public Server {
+protected:
+    void            *_event_arg;
+public:
+    SubRoutine();
+    virtual ~SubRoutine();
+    struct Error init(Base *base, WorkerFunc func, void *user_arg = NULL, BOOL auto_free = TRUE);
+
+    struct Error sleep(double seconds);     // can ONLY be incoked inside coroutine
+    struct Error sleep(const struct timeval &sleep_time);
+    struct Error sleep_milisecs(unsigned mili_secs);
+private:
+    void _init();
+    void _clear();
+protected:
+    struct stCoRoutine_t *_coroutine();
 };
 
 
@@ -159,27 +193,6 @@ public:
     virtual std::string remote_addr() = 0;    // valid in IPv4 or IPv6 type
     virtual unsigned remote_port() = 0;       // valid in IPv4 or IPv6 type
     virtual void copy_remote_addr(struct sockaddr *addr_out, socklen_t addr_len) = 0;
-};
-
-
-// ====================
-// pure event, no network interfaces supported
-class NoServer : public Server {
-protected:
-    void            *_event_arg;
-public:
-    NoServer();
-    virtual ~NoServer();
-    struct Error init(Base *base, WorkerFunc func, void *user_arg = NULL, BOOL auto_free = TRUE);
-
-    struct Error sleep(double seconds);     // can ONLY be incoked inside coroutine
-    struct Error sleep(const struct timeval &sleep_time);
-    struct Error sleep_milisecs(unsigned mili_secs);
-private:
-    void _init();
-    void _clear();
-protected:
-    struct stCoRoutine_t *_coroutine();
 };
 
 
@@ -254,7 +267,7 @@ protected:
 
 
 // UDP Session
-class UDPSession : public Server {
+class UDPSession : public Session {
 public:
     UDPSession(){};
     virtual ~UDPSession(){};
@@ -297,7 +310,7 @@ public:
     virtual unsigned remote_port() = 0;       // valid in IPv4 or IPv6 type
     virtual void copy_remote_addr(struct sockaddr *addr_out, socklen_t addr_len) = 0;
 
-    virtual Server *owner_server() = 0;
+    virtual Procedure *owner_server() = 0;
 };
 
 
@@ -406,7 +419,7 @@ private:
 
 
 // TCPSession
-class TCPSession : public Server {
+class TCPSession : public Session {
 public:
     TCPSession(){};
     virtual ~TCPSession(){};
@@ -458,7 +471,7 @@ public:
     virtual unsigned remote_port() = 0;       // valid in IPv4 or IPv6 type
     virtual void copy_remote_addr(struct sockaddr *addr_out, socklen_t addr_len) = 0;
 
-    virtual Server *owner_server() = 0;
+    virtual Procedure *owner_server() = 0;
 };
 
 

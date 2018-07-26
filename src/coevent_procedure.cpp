@@ -18,7 +18,7 @@ typedef Event _super;
 #define __PUBLIC_FUNCTIONS
 #ifdef __PUBLIC_FUNCTIONS
 
-UDPClient *Server::new_UDP_client(NetType_t network_type, void *user_arg)
+UDPClient *Procedure::new_UDP_client(NetType_t network_type, void *user_arg)
 {
     if (NULL == _coroutine()) {
         return NULL;
@@ -39,7 +39,7 @@ UDPClient *Server::new_UDP_client(NetType_t network_type, void *user_arg)
 }
 
 
-DNSClient *Server::new_DNS_client(NetType_t network_type, void *user_arg)
+DNSClient *Procedure::new_DNS_client(NetType_t network_type, void *user_arg)
 {
     if (NULL == _coroutine()) {
         return NULL;
@@ -60,7 +60,7 @@ DNSClient *Server::new_DNS_client(NetType_t network_type, void *user_arg)
 }
 
 
-TCPClient *Server::new_TCP_client(NetType_t network_type, void *user_arg)
+TCPClient *Procedure::new_TCP_client(NetType_t network_type, void *user_arg)
 {
     if (NULL == _coroutine()) {
         return NULL;
@@ -81,7 +81,7 @@ TCPClient *Server::new_TCP_client(NetType_t network_type, void *user_arg)
 }
 
 
-struct Error Server::delete_client(Client *client)
+struct Error Procedure::delete_client(Client *client)
 {
     if (NULL == client) {
         _status.set_app_errno(ERR_PARA_NULL);
@@ -105,9 +105,9 @@ struct Error Server::delete_client(Client *client)
 }
 
 
-Server::~Server()
+Procedure::~Procedure()
 {
-    DEBUG("Delete Server client chain of %s", _identifier.c_str());
+    DEBUG("Delete procedure client chain of %s", _identifier.c_str());
 
     // free all clients under control
     for (std::set<Client *>::iterator it = _client_chain.begin(); 
@@ -122,7 +122,7 @@ Server::~Server()
 }
 
 
-struct stCoRoutine_t *Server::_coroutine()
+struct stCoRoutine_t *Procedure::_coroutine()
 {
     return NULL;
 }

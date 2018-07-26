@@ -40,7 +40,7 @@ static void _libevent_callback(evutil_socket_t fd, short what, void *libevent_ar
 {
     struct _EventArg *arg = (struct _EventArg *)libevent_arg;
     UDPItnlClient *client = arg->event;
-    Server *server = client->owner_server();
+    Procedure *server = client->owner_server();
     Base *base = client->owner();
 
     // switch into the coroutine
@@ -240,7 +240,7 @@ void UDPItnlClient::copy_remote_addr(struct sockaddr *addr_out, socklen_t addr_l
 }
 
 
-Server *UDPItnlClient::owner_server()
+Procedure *UDPItnlClient::owner_server()
 {
     return _owner_server;
 }
@@ -267,7 +267,7 @@ struct sockaddr *UDPItnlClient::_remote_addr()
 #define __INTERFACE_INIT
 #ifdef __INTERFACE_INIT
 
-struct Error UDPItnlClient::init(Server *server, struct stCoRoutine_t *coroutine, NetType_t network_type, void *user_arg)
+struct Error UDPItnlClient::init(Procedure *server, struct stCoRoutine_t *coroutine, NetType_t network_type, void *user_arg)
 {
     if (!(server && coroutine)) {
         _status.set_app_errno(ERR_PARA_NULL);

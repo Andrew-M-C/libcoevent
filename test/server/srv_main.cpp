@@ -196,7 +196,7 @@ static void _tcp_session_routine(evutil_socket_t fd, Event *abs_server, void *ar
 
 static void _simple_test_routine(evutil_socket_t fd, Event *abs_server, void *arg)
 {
-    NoServer *routine = (NoServer *)abs_server;
+    SubRoutine *routine = (SubRoutine *)abs_server;
     std::string server_address;
     Error status;
 
@@ -257,7 +257,7 @@ int main(int argc, char *argv[])
     Error status;
     UDPServer *server_A = new UDPServer;
     TCPServer *server_B = new TCPServer;
-    NoServer *dummy_server = new NoServer;
+    SubRoutine *dummy_server = new SubRoutine;
     LOG("Hello, libcoevent! Base: %s", base->identifier().c_str());
 
     status = server_A->init_session_mode(base, _udp_session_routine, NetIPv4, _UDP_PORT, server_A);

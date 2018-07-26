@@ -190,7 +190,7 @@ void DNSItnlClient::_init()
 }
 
 
-struct Error DNSItnlClient::init(Server *server, struct stCoRoutine_t *coroutine, NetType_t network_type, void *user_arg)
+struct Error DNSItnlClient::init(Procedure *server, struct stCoRoutine_t *coroutine, NetType_t network_type, void *user_arg)
 {
     if (!(server && coroutine)) {
         _status.set_app_errno(ERR_PARA_NULL);
@@ -259,7 +259,7 @@ std::string DNSItnlClient::quick_resolve(const std::string &domain_name, double 
 }
 
 
-Server *DNSItnlClient::owner_server()
+Procedure *DNSItnlClient::owner_server()
 {
     if (_udp_client) {
         return _udp_client->owner_server();
