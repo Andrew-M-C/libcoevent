@@ -25,10 +25,17 @@ namespace libcoevent {
 
 class Base;
 class Event;
+class Server;
 class Client;
+
+class UDPServer;
 class UDPClient;
 class DNSClient;
 class UDPSession;
+
+class TCPServer;
+class TCPSession;
+class TCPClient;
 
 
 // network type
@@ -76,6 +83,7 @@ public:
 };
 
 
+// ====================
 // event base of libcoevent
 class Base {
     // private implementations
@@ -97,7 +105,8 @@ public:
 };
 
 
-// abstract event of libcoevent
+// ====================
+// Base class of all libcoevent events
 class Event {
 protected:
     std::string     _identifier;
@@ -126,38 +135,41 @@ public:
 
 
 // abstract event of servers
-class Server : public Event {
+class Procedure : public Event {
 protected:
     std::set<Client *>  _client_chain;
 public:
-    virtual ~Server();
+    virtual ~Procedure();
     struct Error delete_client(Client *client);
     UDPClient *new_UDP_client(NetType_t network_type, void *user_arg = NULL);
     DNSClient *new_DNS_client(NetType_t network_type, void *user_arg = NULL);
+    TCPClient *new_TCP_client(NetType_t network_type, void *user_arg = NULL);
 protected:
-    virtual struct stCoRoutine_t *_coroutine() = 0;
+    virtual struct stCoRoutine_t *_coroutine();
 };
 
 
-// abstract event of clients
-// Client classes should ONLY been instantiated by Server objects 
-class Client : public Event {
+class Server : public Procedure {
 public:
-    Client(){};
-    virtual ~Client(){};
-    virtual std::string remote_addr() = 0;    // valid in IPv4 or IPv6 type
-    virtual unsigned remote_port() = 0;       // valid in IPv4 or IPv6 type
-    virtual void copy_remote_addr(struct sockaddr *addr_out, socklen_t addr_len) = 0;
+    Server(){};
+    virtual ~Server(){};
+};
+
+class Session : public Procedure {
+public:
+    Session(){}
+    virtual ~Session(){};
 };
 
 
+// ====================
 // pure event, no network interfaces supported
-class NoServer : public Server {
+class SubRoutine : public Server {
 protected:
     void            *_event_arg;
 public:
-    NoServer();
-    virtual ~NoServer();
+    SubRoutine();
+    virtual ~SubRoutine();
     struct Error init(Base *base, WorkerFunc func, void *user_arg = NULL, BOOL auto_free = TRUE);
 
     struct Error sleep(double seconds);     // can ONLY be incoked inside coroutine
@@ -171,6 +183,20 @@ protected:
 };
 
 
+// abstract event of clients
+// Client classes should ONLY been instantiated by Server objects 
+// should NOT invoke delete to clients!!!
+class Client : public Event {
+public:
+    Client(){};
+    virtual ~Client(){};
+    virtual std::string remote_addr() = 0;    // valid in IPv4 or IPv6 type
+    virtual unsigned remote_port() = 0;       // valid in IPv4 or IPv6 type
+    virtual void copy_remote_addr(struct sockaddr *addr_out, socklen_t addr_len) = 0;
+};
+
+
+// ====================
 // UDP server
 class UDPServer : public Server {
 protected:
@@ -189,6 +215,8 @@ protected:
     socklen_t           _remote_addr_ipv6_len;
     struct sockaddr_un  _remote_addr_unix;
     socklen_t           _remote_addr_unix_len;
+
+    std::map<std::string, UDPSession *> _session_collection;
 
 public:
     UDPServer();
@@ -239,7 +267,7 @@ protected:
 
 
 // UDP Session
-class UDPSession : public Server {
+class UDPSession : public Session {
 public:
     UDPSession(){};
     virtual ~UDPSession(){};
@@ -282,10 +310,11 @@ public:
     virtual unsigned remote_port() = 0;       // valid in IPv4 or IPv6 type
     virtual void copy_remote_addr(struct sockaddr *addr_out, socklen_t addr_len) = 0;
 
-    virtual Server *owner_server() = 0;
+    virtual Procedure *owner_server() = 0;
 };
 
 
+// ====================
 // DNSClient
 class DNSResult;
 class DNSResourceRecord;
@@ -302,6 +331,7 @@ public:
     virtual std::string default_dns_server(size_t index = 0, NetType_t *network_type_out = NULL) = 0;
 
     virtual const DNSResult *dns_result(const std::string &domain_name) = 0;
+    virtual std::string quick_resolve(const std::string &domain_name, double timeout_seconds = 0, const std::string &dns_server_ip = "") = 0;
 };
 
 
@@ -359,6 +389,90 @@ public:
 };
 
 
+// ====================
+// TCPServer
+class TCPServer : public Server {
+private:
+    void                        *_event_arg;
+    int                         _fd;
+    struct sockaddr_storage     _sock_addr;
+    socklen_t                   _sock_addr_len;
+    std::map<int, TCPSession *> _sessions;
+    unsigned                    _port;
+public:
+    TCPServer();
+    virtual ~TCPServer();
+
+    struct Error init_session_mode(Base *base, WorkerFunc session_func, const struct sockaddr *addr, socklen_t addr_len, void *user_arg = NULL, BOOL auto_free = TRUE);
+    struct Error init_session_mode(Base *base, WorkerFunc session_func, NetType_t network_type, int bind_port = 0, void *user_arg = NULL, BOOL auto_free = TRUE);
+    struct Error init_session_mode(Base *base, WorkerFunc session_func, const char *bind_path, void *user_arg = NULL, BOOL auto_free = TRUE);
+    struct Error init_session_mode(Base *base, WorkerFunc session_func, std::string &bind_path, void *user_arg = NULL, BOOL auto_free = TRUE);
+    struct Error quit_session_mode_server();
+    struct Error notify_session_ends(TCPSession *session);      // actually protected
+
+    NetType_t network_type();
+    const char *c_socket_path();    // valid in local type
+    int port();                     // valid in IPv4 or IPv6 type
+private:
+    void _clear();
+};
+
+
+// TCPSession
+class TCPSession : public Session {
+public:
+    TCPSession(){};
+    virtual ~TCPSession(){};
+
+    virtual NetType_t network_type() = 0;
+
+    virtual struct Error reply(const void *data, const size_t data_len, size_t *send_len_out_nullable = NULL) = 0;
+    virtual struct Error recv(void *data_out, const size_t len_limit, size_t *len_out_nullable, double timeout_seconds = 0) = 0;
+    virtual struct Error recv_in_timeval(void *data_out, const size_t len_limit, size_t *len_out_nullable, const struct timeval &timeout) = 0;
+    virtual struct Error recv_in_mimlisecs(void *data_out, const size_t len_limit, size_t *len_out_nullable, unsigned timeout_milisecs) = 0;
+
+    virtual struct Error sleep(double seconds) = 0;
+    virtual struct Error sleep(struct timeval &sleep_time) = 0;
+    virtual struct Error sleep_milisecs(unsigned mili_secs) = 0;
+
+    virtual std::string remote_addr() = 0;      // valid in IPv4 or IPv6 type
+    virtual unsigned remote_port() = 0;         // valid in IPv4 or IPv6 type
+    virtual void copy_remote_addr(struct sockaddr *addr_out, socklen_t addr_len) = 0;
+};
+
+
+// TCPClient
+class TCPClient : public Client {
+public:
+    TCPClient(){};
+    virtual ~TCPClient(){};
+
+    virtual NetType_t network_type() = 0;
+
+    virtual struct Error connect_to_server(const struct sockaddr *addr, socklen_t addr_len, double timeout_seconds = 0) = 0;
+    virtual struct Error connect_to_server(const std::string &target_address = "", unsigned target_port = 80, double timeout_seconds = 0) = 0;
+    virtual struct Error connect_to_server(const char *target_address = "", unsigned target_port = 80, double timeout_seconds = 0) = 0;
+
+    virtual struct Error connect_in_timeval(const struct sockaddr *addr, socklen_t addr_len, const struct timeval &timeout) = 0;
+    virtual struct Error connect_in_timeval(const std::string &target_address, unsigned target_port, const struct timeval &timeout) = 0;
+    virtual struct Error connect_in_timeval(const char *target_address, unsigned target_port, const struct timeval &timeout) = 0;
+
+    virtual struct Error connect_in_mimlisecs(const struct sockaddr *addr, socklen_t addr_len, unsigned timeout_milisecs) = 0;
+    virtual struct Error connect_in_mimlisecs(const std::string &target_address, unsigned target_port, unsigned timeout_milisecs) = 0;
+    virtual struct Error connect_in_mimlisecs(const char *target_address, unsigned target_port, unsigned timeout_milisecs) = 0;
+
+    virtual struct Error send(const void *data, const size_t data_len, size_t *send_len_out_nullable = NULL) = 0;
+
+    virtual struct Error recv(void *data_out, const size_t len_limit, size_t *len_out_nullable, double timeout_seconds) = 0;
+    virtual struct Error recv_in_timeval(void *data_out, const size_t len_limit, size_t *len_out_nullable, const struct timeval &timeout) = 0;
+    virtual struct Error recv_in_mimlisecs(void *data_out, const size_t len_limit, size_t *len_out_nullable, unsigned timeout_milisecs) = 0;
+
+    virtual std::string remote_addr() = 0;    // valid in IPv4 or IPv6 type
+    virtual unsigned remote_port() = 0;       // valid in IPv4 or IPv6 type
+    virtual void copy_remote_addr(struct sockaddr *addr_out, socklen_t addr_len) = 0;
+
+    virtual Procedure *owner_server() = 0;
+};
 
 
 }   // end of namespace libcoevent

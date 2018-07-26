@@ -13,6 +13,7 @@ using namespace andrewmc::libcoevent;
 using namespace andrewmc::cpptools;
 
 #define _UDP_PORT       (2333)
+#define _TCP_PORT       (6666)
 
 #define LOG(fmt, args...)   _print("SERVER: %s, %s, %d: "fmt, __FILE__, __func__, __LINE__, ##args)
 static ssize_t _print(const char *format, ...)
@@ -145,6 +146,107 @@ static void _udp_session_routine(evutil_socket_t fd, Event *abs_server, void *ar
 
 #endif
 
+
+// ==========
+#define __TCP_SERVER
+#ifdef __TCP_SERVER
+
+static void _tcp_session_routine(evutil_socket_t fd, Event *abs_server, void *arg)
+{
+    TCPSession *session = (TCPSession *)abs_server;
+    struct Error status;
+    size_t recv_len = 0;
+
+    ::andrewmc::cpptools::Data data_buff;
+
+    status = session->recv(data_buff.mutable_raw_data(), data_buff.buff_capacity(), &recv_len, 2.0);
+    if (FALSE == status.is_ok()) {
+        LOG("TCP session error: %s", status.c_err_msg());
+        return;
+    }
+
+    data_buff.set_raw_data_length(recv_len);
+    data_buff.append_nul();
+
+    // read data
+    LOG("Got TCP session data: %s", ::andrewmc::cpptools::dump_data_to_string(data_buff).c_str());
+    if (0 == strcmp((char *)(data_buff.c_data()), "quit")) {
+        LOG("Now quit server");
+        TCPServer *server = (TCPServer *)arg;
+        server->quit_session_mode_server();
+    }
+
+    // reply
+    LOG("Now reply");
+    const char reply_msg[] = "Thank you for your TCP stream.";
+    session->reply(reply_msg, sizeof(reply_msg), &recv_len);
+    LOG("%u byte(s) sent", (unsigned)recv_len);
+
+    // end
+    LOG("TCP session ends");
+    return;
+}
+
+#endif
+
+
+// ==========
+#define __SIMPLE_TEST_ROUTINE
+#ifdef __SIMPLE_TEST_ROUTINE
+
+static void _simple_test_routine(evutil_socket_t fd, Event *abs_server, void *arg)
+{
+    SubRoutine *routine = (SubRoutine *)abs_server;
+    std::string server_address;
+    Error status;
+
+    LOG("Routine starts");
+
+    // do DNS request
+    {
+        DNSClient *dns_client = routine->new_DNS_client(NetIPv4);
+        if (NULL == dns_client) {
+            LOG("Cannot get DNS client");
+            return;
+        }
+
+        const char *domain_name = "www.sysu.edu.cn";
+        server_address = dns_client->quick_resolve(domain_name, 5.0);
+        if (0 == server_address.length()) {
+            LOG("Failed to resolve domain address");
+            return;
+        }
+
+        LOG("IP address for %s: %s", domain_name, server_address.c_str());
+        routine->delete_client(dns_client);
+    }
+
+    // do connect
+    {
+        TCPClient *tcp = routine->new_TCP_client(NetIPv4);
+        if (NULL == tcp) {
+            LOG("Failed to get TCP client");
+            return;
+        }
+
+        status = tcp->connect_to_server(server_address, 80, 5.0);
+        if (status.is_error()) {
+            LOG("Failed to connect to server: %s", status.c_err_msg());
+            return;
+        }
+
+        LOG("Connect success");
+        routine->delete_client(tcp);
+    }
+
+    routine->sleep(1.0);
+    LOG("Test routine ends");
+    return;
+}
+
+
+#endif  // end of __SIMPLE_TEST_ROUTINE
+
 // ==========
 #define __MAIN
 #ifdef __MAIN
@@ -152,16 +254,38 @@ static void _udp_session_routine(evutil_socket_t fd, Event *abs_server, void *ar
 int main(int argc, char *argv[])
 {
     Base *base = new Base;
+    Error status;
     UDPServer *server_A = new UDPServer;
+    TCPServer *server_B = new TCPServer;
+    SubRoutine *dummy_server = new SubRoutine;
     LOG("Hello, libcoevent! Base: %s", base->identifier().c_str());
 
-    server_A->init_session_mode(base, _udp_session_routine, NetIPv4, _UDP_PORT, server_A);
+    status = server_A->init_session_mode(base, _udp_session_routine, NetIPv4, _UDP_PORT, server_A);
+    if (FALSE == status.is_ok()) {
+        LOG("Init UDP server failed: %s", status.c_err_msg());
+        goto END;
+    }
+
+    status = server_B->init_session_mode(base, _tcp_session_routine, NetIPv4, _TCP_PORT, server_B);
+    if (FALSE == status.is_ok()) {
+        LOG("Init TCP server failed: %s", status.c_err_msg());
+        goto END;
+    }
+
+    status = dummy_server->init(base, _simple_test_routine);
+    if (FALSE == status.is_ok()) {
+        LOG("Init test routine failed: %s", status.c_err_msg());
+        goto END;
+    }
+
     base->run();
 
+END:
     LOG("libcoevent base ends");
     delete base;
     base = NULL;
     server_A = NULL;
+    server_B = NULL;
 
     return 0;
 }

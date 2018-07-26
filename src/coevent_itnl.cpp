@@ -176,6 +176,12 @@ BOOL andrewmc::libcoevent::event_readable(uint32_t libevent_what)
 }
 
 
+BOOL andrewmc::libcoevent::event_writable(uint32_t libevent_what)
+{
+    return (libevent_what & EV_WRITE) ? TRUE : FALSE;
+}
+
+
 BOOL andrewmc::libcoevent::event_got_signal(uint32_t libevent_what)
 {
     return (libevent_what & EV_SIGNAL) ? TRUE : FALSE;

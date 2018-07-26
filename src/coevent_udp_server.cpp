@@ -31,7 +31,7 @@ struct _EventArg {
     WorkerFunc          session_worker_func;
     void                *session_user_arg;
 
-    std::map<std::string, UDPItnlSession *> session_collection;
+    std::map<std::string, UDPSession *> *session_collection;
 
     _EventArg(): event(NULL), fd(0), libevent_what_ptr(NULL), coroutine(NULL)
     {}
@@ -101,7 +101,7 @@ static void _session_mode_worker(evutil_socket_t fd, Event *abs_server, void *li
     void *user_arg = arg->session_user_arg;
     WorkerFunc worker_func = arg->session_worker_func;
     UDPServer *server = (UDPServer *)abs_server;
-    std::map<std::string, UDPItnlSession *> &session_collection = arg->session_collection;
+    std::map<std::string, UDPSession *> *session_collection = arg->session_collection;
 
     uint8_t data_buff[4096];
     size_t recv_len = 0;
@@ -136,9 +136,11 @@ static void _session_mode_worker(evutil_socket_t fd, Event *abs_server, void *li
 
             std::string remote_key = std::string(remote_key_buff);
 
-            std::map<std::string, UDPItnlSession *>::iterator session_iter = session_collection.find(remote_key);
-            if (session_collection.end() != session_iter) {
-                session_iter->second->forward_incoming_data(data_buff, recv_len);
+            std::map<std::string, UDPSession *>::iterator session_iter = session_collection->find(remote_key);
+            if (session_collection->end() != session_iter)
+            {
+                UDPItnlSession *session = (UDPItnlSession *)(session_iter->second);
+                session->forward_incoming_data(data_buff, recv_len);
             }
             else {
                 // we should create a session
@@ -154,7 +156,7 @@ static void _session_mode_worker(evutil_socket_t fd, Event *abs_server, void *li
                 else {
                     DEBUG("Create session for %s", remote_key.c_str());
                     session->forward_incoming_data(data_buff, recv_len);
-                    session_collection[remote_key] = session;
+                    (*session_collection)[remote_key] = (UDPSession *)session;
                 }
             }
         }
@@ -268,6 +270,7 @@ struct Error UDPServer::init(Base *base, WorkerFunc func, const struct sockaddr 
     arg->user_arg = user_arg;
     arg->worker_func = func;
     arg->libevent_what_ptr = _libevent_what_storage;
+    arg->session_collection = &_session_collection;
     DEBUG("arg->libevent_what_ptr = %p", arg->libevent_what_ptr);
     DEBUG("User arg: %08p", user_arg);
 
@@ -447,29 +450,6 @@ void UDPServer::_clear()
         _event = NULL;
     }
 
-    if (_event_arg) {
-        struct _EventArg *arg = (struct _EventArg *)_event_arg;
-        _event_arg = NULL;
-
-        if (arg->coroutine) {
-            DEBUG("remove coroutine");
-            co_release(arg->coroutine);
-            arg->coroutine = NULL;
-        }
-
-        for (std::map<std::string, UDPItnlSession *>::iterator each_session = (arg->session_collection).begin();
-            each_session != arg->session_collection.end();
-            each_session ++)
-        {
-            DEBUG("delete session %s", each_session->second->identifier().c_str());
-            delete each_session->second;
-        }
-        arg->session_collection.clear();
-
-        DEBUG("Delete _event_arg");
-        delete arg;
-    }
-
     if (_fd_ipv4) {
         close(_fd_ipv4);
     }
@@ -480,7 +460,6 @@ void UDPServer::_clear()
         close(_fd_unix);
     }
 
-    _event_arg = NULL;
     _fd_ipv4 = 0;
     _fd_ipv6 = 0;
     _fd_unix = 0;
@@ -499,6 +478,29 @@ UDPServer::~UDPServer()
 {
     DEBUG("Delete UDP server %s", _identifier.c_str());
     _clear();
+
+    for (std::map<std::string, UDPSession *>::iterator each_session = _session_collection.begin();
+        each_session != _session_collection.end();
+        each_session ++)
+    {
+        DEBUG("delete session %s", each_session->second->identifier().c_str());
+        delete each_session->second;
+    }
+    _session_collection.clear();
+
+    if (_event_arg) {
+        struct _EventArg *arg = (struct _EventArg *)_event_arg;
+        _event_arg = NULL;
+
+        if (arg->coroutine) {
+            DEBUG("remove coroutine");
+            co_release(arg->coroutine);
+            arg->coroutine = NULL;
+        }
+
+        DEBUG("Delete _event_arg");
+        delete arg;
+    }
 
     if (_libevent_what_storage) {
         free(_libevent_what_storage);
@@ -580,20 +582,18 @@ struct Error UDPServer::quit_session_mode_server()
 
 struct Error UDPServer::notify_session_ends(UDPSession *session)
 {
-    struct _EventArg *arg = (struct _EventArg *)_event_arg;
     std::string remote_ip = session->remote_addr();
     unsigned remote_port = session->remote_port();
 
     char remote_key_buff[128];
     snprintf(remote_key_buff, sizeof(remote_key_buff), "%s:%u", remote_ip.c_str(), remote_port);
 
-    std::map<std::string, UDPItnlSession *> &session_collection = arg->session_collection;
-    std::map<std::string, UDPItnlSession *>::iterator session_in_control = session_collection.find(remote_key_buff);
+    std::map<std::string, UDPSession *>::iterator session_in_control = _session_collection.find(remote_key_buff);
     
-    if (session_collection.end() != session_in_control)
+    if (_session_collection.end() != session_in_control)
     {
         DEBUG("dispatch session %s", session_in_control->second->identifier().c_str());
-        session_collection.erase(session_in_control);
+        _session_collection.erase(session_in_control);
         _status.clear_err();
     }
     else {
@@ -750,7 +750,7 @@ struct Error UDPServer::sleep(double seconds)
 struct Error UDPServer::recv_in_timeval(void *data_out, const size_t len_limit, size_t *len_out, const struct timeval &timeout)
 {
     ssize_t recv_len = 0;
-    uint32_t libevent_what = 0;
+    volatile uint32_t libevent_what = 0;
     struct _EventArg *arg = (struct _EventArg *)_event_arg;
 
     // param check

@@ -18,6 +18,7 @@ const char *g_error_msg_list[] = {
     "failed to dispatch libevent base",
     "failed to dispatch libevent event",
     "no events were pending or active",
+    "unexpected error in libevent",
 
     "failed to create libco routine",
     "necessary parameter is null",
@@ -32,6 +33,8 @@ const char *g_error_msg_list[] = {
 
     "object is not initialized",
     "object not found",
+    "client already connected",
+    "client not connected",
 
     "cannot find approperate DNS server IP",
 

@@ -16,7 +16,7 @@ static int _g_libco_arg_counter = 0;    // to detect memory leaks
 
 
 struct _EventArg {
-    NoServer            *event;
+    SubRoutine          *event;
     void                *user_arg;
     WorkerFunc          worker_func;
     struct stCoRoutine_t *coroutine;
@@ -66,7 +66,7 @@ static void _libevent_callback(evutil_socket_t fd, short what, void *libevent_ar
     // is coroutine end?
     if (is_coroutine_end(arg->coroutine)) {
         // delete the server if this is under control of the base
-        NoServer *server = arg->event;
+        SubRoutine *server = arg->event;
         Base *base = server->owner();
 
         DEBUG("evtimer %s ends", server->identifier().c_str());
@@ -85,40 +85,18 @@ static void _libevent_callback(evutil_socket_t fd, short what, void *libevent_ar
 #define __PUBLIC_FUNCTIONS
 #ifdef __PUBLIC_FUNCTIONS
 
-NoServer::NoServer()
+SubRoutine::SubRoutine()
 {
-    DEBUG("Create 'NO' server");
+    DEBUG("Create sub routine");
     this->_init();
     return;
 }
 
 
-NoServer::~NoServer()
+SubRoutine::~SubRoutine()
 {
-    DEBUG("Delete 'NO' server");
+    DEBUG("Delete sub routine");
     this->_clear();
-    return;
-}
-
-
-void NoServer::_init()
-{
-    char identifier[64];
-    sprintf(identifier, "NO server %p", this);
-    _identifier = identifier;
-
-    _event_arg = NULL;
-    return;
-}
-
-
-void NoServer::_clear()
-{
-    if (_event) {
-        DEBUG("Delete evtimer");
-        evtimer_del(_event);
-        _event = NULL;
-    }
 
     if (_event_arg) {
         struct _EventArg *arg = (struct _EventArg *)_event_arg;
@@ -133,12 +111,34 @@ void NoServer::_clear()
         DEBUG("Delete _event_arg");
         delete arg;
     }
+    return;
+}
+
+
+void SubRoutine::_init()
+{
+    char identifier[64];
+    sprintf(identifier, "sub routine %p", this);
+    _identifier = identifier;
+
+    _event_arg = NULL;
+    return;
+}
+
+
+void SubRoutine::_clear()
+{
+    if (_event) {
+        DEBUG("Delete evtimer");
+        evtimer_del(_event);
+        _event = NULL;
+    }
 
     return;
 }
 
 
-struct stCoRoutine_t *NoServer::_coroutine()
+struct stCoRoutine_t *SubRoutine::_coroutine()
 {
     if (_event_arg) {
         struct _EventArg *arg = (struct _EventArg *)_event_arg;
@@ -150,7 +150,7 @@ struct stCoRoutine_t *NoServer::_coroutine()
 }
 
 
-struct Error NoServer::init(Base *base, WorkerFunc func, void *user_arg, BOOL auto_free)
+struct Error SubRoutine::init(Base *base, WorkerFunc func, void *user_arg, BOOL auto_free)
 {
     if (NULL == base) {
         _status.set_app_errno(ERR_PARA_NULL);
@@ -197,7 +197,7 @@ struct Error NoServer::init(Base *base, WorkerFunc func, void *user_arg, BOOL au
 }
 
 
-struct Error NoServer::sleep(const struct timeval &sleep_time)
+struct Error SubRoutine::sleep(const struct timeval &sleep_time)
 {
     struct _EventArg *arg = (struct _EventArg *)_event_arg;
     struct timeval sleep_time_copy;
@@ -212,13 +212,13 @@ struct Error NoServer::sleep(const struct timeval &sleep_time)
 }
 
 
-struct Error NoServer::sleep_milisecs(unsigned mili_secs)
+struct Error SubRoutine::sleep_milisecs(unsigned mili_secs)
 {
     return sleep(to_timeval_from_milisecs(mili_secs));
 }
 
 
-struct Error NoServer::sleep(double seconds)
+struct Error SubRoutine::sleep(double seconds)
 {
     if (seconds <= 0) {
         _status.clear_err();

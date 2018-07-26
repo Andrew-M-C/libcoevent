@@ -39,6 +39,9 @@ struct _EventArg {
 static void _libevent_callback(evutil_socket_t fd, short what, void *libevent_arg)
 {
     struct _EventArg *arg = (struct _EventArg *)libevent_arg;
+    UDPItnlClient *client = arg->event;
+    Procedure *server = client->owner_server();
+    Base *base = client->owner();
 
     // switch into the coroutine
     if (arg->libevent_what_ptr) {
@@ -50,10 +53,6 @@ static void _libevent_callback(evutil_socket_t fd, short what, void *libevent_ar
     // is coroutine end?
     if (is_coroutine_end(arg->coroutine)) {
         // delete the event if this is under control of the base
-        UDPItnlClient *client = arg->event;
-        Server *server = client->owner_server();
-        Base *base = client->owner();
-
         DEBUG("Server %s ends", server->identifier().c_str());
         base->delete_event_under_control(server);
     }
@@ -71,6 +70,9 @@ static void _libevent_callback(evutil_socket_t fd, short what, void *libevent_ar
 
 UDPItnlClient::UDPItnlClient()
 {
+    char identifier[64];
+    sprintf(identifier, "UDP client %p", this);
+    _identifier = identifier;
     _init();
     return;
 }
@@ -79,6 +81,16 @@ UDPItnlClient::UDPItnlClient()
 UDPItnlClient::~UDPItnlClient()
 {
     _clear();
+
+    if (_event_arg) {
+        struct _EventArg *arg = (struct _EventArg *)_event_arg;
+        _event_arg = NULL;
+
+        // do not remove coroutine because client does not own it
+
+        DEBUG("Delete _event_arg");
+        free(arg);
+    }
 
     if (_libevent_what_storage) {
         free(_libevent_what_storage);
@@ -90,10 +102,6 @@ UDPItnlClient::~UDPItnlClient()
 
 void UDPItnlClient::_init()
 {
-    char identifier[64];
-    sprintf(identifier, "UDP client %p", this);
-    _identifier = identifier;
-
     _event_arg = NULL;
     _owner_server = NULL;
     _fd_ipv4 = 0;
@@ -125,16 +133,6 @@ void UDPItnlClient::_clear()
         _event = NULL;
     }
 
-    if (_event_arg) {
-        struct _EventArg *arg = (struct _EventArg *)_event_arg;
-        _event_arg = NULL;
-
-        // do not remove coroutine because client does not own it
-
-        DEBUG("Delete _event_arg");
-        free(arg);
-    }
-
     if (_fd_ipv4) {
         close(_fd_ipv4);
     }
@@ -146,7 +144,6 @@ void UDPItnlClient::_clear()
     }
 
     _fd = 0;
-    _event_arg = NULL;
     _fd_ipv4 = 0;
     _fd_ipv6 = 0;
     _fd_unix = 0;
@@ -243,7 +240,7 @@ void UDPItnlClient::copy_remote_addr(struct sockaddr *addr_out, socklen_t addr_l
 }
 
 
-Server *UDPItnlClient::owner_server()
+Procedure *UDPItnlClient::owner_server()
 {
     return _owner_server;
 }
@@ -270,7 +267,7 @@ struct sockaddr *UDPItnlClient::_remote_addr()
 #define __INTERFACE_INIT
 #ifdef __INTERFACE_INIT
 
-struct Error UDPItnlClient::init(Server *server, struct stCoRoutine_t *coroutine, NetType_t network_type, void *user_arg)
+struct Error UDPItnlClient::init(Procedure *server, struct stCoRoutine_t *coroutine, NetType_t network_type, void *user_arg)
 {
     if (!(server && coroutine)) {
         _status.set_app_errno(ERR_PARA_NULL);
@@ -295,6 +292,9 @@ struct Error UDPItnlClient::init(Server *server, struct stCoRoutine_t *coroutine
 
     _init();
     _status.clear_err();
+
+    _owner_server = server;
+    _owner_base = server->owner();
 
     // create arguments and assign coroutine
     int fd = 0;
@@ -371,8 +371,6 @@ struct Error UDPItnlClient::init(Server *server, struct stCoRoutine_t *coroutine
     set_fd_nonblock(fd);
 
     // create event
-    _owner_server = server;
-    _owner_base = server->owner();
     _owner_base->put_event_under_control(this);
     _event = event_new(_owner_base->event_base(), fd, EV_TIMEOUT | EV_READ, _libevent_callback, arg);
     if (NULL == _event) {
@@ -549,7 +547,7 @@ struct Error UDPItnlClient::recv_in_timeval(void *data_out, const size_t len_lim
             _status.set_app_errno(ERR_TIMEOUT);
         }
         else {
-            ERROR("unrecognized event flag: 0x%04u", libevent_what);
+            ERROR("unrecognized event flag: 0x%04u", (unsigned)libevent_what);
             _status.set_app_errno(ERR_UNKNOWN);
         }
     }

@@ -88,6 +88,7 @@ const std::string &Base::identifier()
 
 void Base::put_event_under_control(Event *event)
 {
+    DEBUG("Request handle event %p", event);
     _events_under_control.insert(event);
     return;
 }
@@ -95,6 +96,8 @@ void Base::put_event_under_control(Event *event)
 
 void Base::delete_event_under_control(Event *event)
 {
+    DEBUG("Request delete event %p", event);
+
     std::set<Event *>::iterator it = _events_under_control.find(event);
     if (it != _events_under_control.end()) {
         DEBUG("Delete event: %s", (*it)->identifier().c_str());
