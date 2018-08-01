@@ -56,20 +56,17 @@ struct Error {
 private:
     uint16_t _sys_errno;    // error defined in "errno.h"
     uint16_t _lib_errno;    // error defined by libcoevent in coevent_const.h
-    ssize_t  _ssize_ret;
     const char *_err_msg;
 
 public:
     Error():
-        _sys_errno(0),_lib_errno(0),_ssize_ret(0),_err_msg(NULL)
+        _sys_errno(0),_lib_errno(0),_err_msg(NULL)
     {}
 
     BOOL is_error();
     BOOL is_OK();
     BOOL is_ok();
     BOOL is_timeout();
-    void set_ssize_t(ssize_t val);
-    ssize_t ssize();
     void clear_err();
     void set_sys_errno();
     void set_sys_errno(int sys_errno);
@@ -430,6 +427,8 @@ public:
     virtual struct Error recv(void *data_out, const size_t len_limit, size_t *len_out_nullable, double timeout_seconds = 0) = 0;
     virtual struct Error recv_in_timeval(void *data_out, const size_t len_limit, size_t *len_out_nullable, const struct timeval &timeout) = 0;
     virtual struct Error recv_in_mimlisecs(void *data_out, const size_t len_limit, size_t *len_out_nullable, unsigned timeout_milisecs) = 0;
+
+    virtual struct Error disconnect(void) = 0;
 
     virtual struct Error sleep(double seconds) = 0;
     virtual struct Error sleep(struct timeval &sleep_time) = 0;

@@ -225,6 +225,9 @@ struct Error TCPServer::init_session_mode(Base *base, WorkerFunc session_func, c
         return _status;
     }
 
+    // set reuseaddr
+    set_fd_reuseaddr(_fd);
+
     // try binding
     int status = bind(_fd, (struct sockaddr *)&_sock_addr, _sock_addr_len);
     if (status < 0) {
