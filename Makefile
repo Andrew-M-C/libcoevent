@@ -23,6 +23,7 @@ LIBCO_GIT_URL = https://github.com/Tencent/libco.git
 LIBCO_LIB_PATH_CONF_DIR = /etc/ld.so.conf.d/
 LIBCO_LIB_DIR_NAME = libcoevent.conf
 LIBCO_LIB_PATH = /usr/local/lib
+LIBCO_LIB_HEADER_PATH = /usr/include
 
 # flagsst 
 CFLAGS += -Wall -g -fPIC -lpthread -I./include -I./src -I./$(LIBCO_DIR) -levent -DDEBUG_FLAG
@@ -61,20 +62,22 @@ all: $(LIBCO_TARGET) $(TARGET_SO) $(TARGET_A)
 
 # install
 .PHONY:install
-install: all
+install:
 	@echo "" > $(LIBCO_LIB_PATH_CONF_DIR)/$(LIBCO_LIB_DIR_NAME)
 	@echo "# libcoevent default configuration" >> $(LIBCO_LIB_PATH_CONF_DIR)/$(LIBCO_LIB_DIR_NAME)
 	@echo "$(LIBCO_LIB_PATH)" >> $(LIBCO_LIB_PATH_CONF_DIR)/$(LIBCO_LIB_DIR_NAME)
-	@install -c $(TARGET_SO) $(LIBCO_LIB_PATH)
-	@install -c $(TARGET_A) $(LIBCO_LIB_PATH)
+	install -c $(TARGET_SO) $(LIBCO_LIB_PATH)
+	install -c $(TARGET_A) $(LIBCO_LIB_PATH)
+	@ls include | xargs -I [] install -m 0664 include/[] $(LIBCO_LIB_HEADER_PATH)
 	@echo "<< libcoevent installed >>"
 
 # uninstall
 .PHONY:uninstall
 uninstall:
-	rm -f $(LIBCO_LIB_PATH)/$(TARGET_SO_FILE_NAME)
-	rm -f $(LIBCO_LIB_PATH)/$(TARGET_A_FILE_NAME)
-	rm -f $(LIBCO_LIB_PATH_CONF_DIR)/$(LIBCO_LIB_DIR_NAME)
+	-rm -f $(LIBCO_LIB_PATH)/$(TARGET_SO_FILE_NAME)
+	-rm -f $(LIBCO_LIB_PATH)/$(TARGET_A_FILE_NAME)
+	-rm -f $(LIBCO_LIB_PATH_CONF_DIR)/$(LIBCO_LIB_DIR_NAME)
+	-@ls include | xargs -I [] rm -f $(LIBCO_LIB_HEADER_PATH)/[]
 	@echo "<< libcoevent uninstalled >>"
 
 # libcoevent
