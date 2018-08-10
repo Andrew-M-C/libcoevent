@@ -16,14 +16,17 @@ TARGET_A = $(BIN_DIR)/$(TARGET_A_FILE_NAME)
 # directories
 LIBCO_DIR = ./libco_from_git
 LIBCO_BIN = $(LIBCO_DIR)/lib
-LIBCO_TARGET = $(LIBCO_BIN)/libcolib.a
+LIBCO_A_FILE_NAME = libcolib.a
+LIBCO_HEADER_FILE_NAME = co_routine.h
+LIBCO_HEADER = $(LIBCO_DIR)/$(LIBCO_HEADER_FILE_NAME)
+LIBCO_TARGET = $(LIBCO_BIN)/$(LIBCO_A_FILE_NAME)
 LIBCO_GIT_URL = https://github.com/Tencent/libco.git
 
 # install parameters
-LIBCO_LIB_PATH_CONF_DIR = /etc/ld.so.conf.d/
-LIBCO_LIB_DIR_NAME = libcoevent.conf
-LIBCO_LIB_PATH = /usr/local/lib
-LIBCO_LIB_HEADER_PATH = /usr/include
+LIBCOEVENT_LIB_PATH_CONF_DIR = /etc/ld.so.conf.d/
+LIBCOEVENT_LIB_DIR_NAME = libcoevent.conf
+LIBCOEVENT_LIB_PATH = /usr/local/lib
+LIBCOEVENT_LIB_HEADER_PATH = /usr/include
 
 # flagsst 
 CFLAGS += -Wall -g -fPIC -lpthread -I./include -I./src -I./$(LIBCO_DIR) -levent -DDEBUG_FLAG
@@ -63,21 +66,25 @@ all: $(LIBCO_TARGET) $(TARGET_SO) $(TARGET_A)
 # install
 .PHONY:install
 install:
-	@echo "" > $(LIBCO_LIB_PATH_CONF_DIR)/$(LIBCO_LIB_DIR_NAME)
-	@echo "# libcoevent default configuration" >> $(LIBCO_LIB_PATH_CONF_DIR)/$(LIBCO_LIB_DIR_NAME)
-	@echo "$(LIBCO_LIB_PATH)" >> $(LIBCO_LIB_PATH_CONF_DIR)/$(LIBCO_LIB_DIR_NAME)
-	install -c $(TARGET_SO) $(LIBCO_LIB_PATH)
-	install -c $(TARGET_A) $(LIBCO_LIB_PATH)
-	@ls include | xargs -I [] install -m 0664 include/[] $(LIBCO_LIB_HEADER_PATH)
+	@echo "" > $(LIBCOEVENT_LIB_PATH_CONF_DIR)/$(LIBCOEVENT_LIB_DIR_NAME)
+	@echo "# libcoevent default configuration" >> $(LIBCOEVENT_LIB_PATH_CONF_DIR)/$(LIBCOEVENT_LIB_DIR_NAME)
+	@echo "$(LIBCOEVENT_LIB_PATH)" >> $(LIBCOEVENT_LIB_PATH_CONF_DIR)/$(LIBCOEVENT_LIB_DIR_NAME)
+	install -c $(TARGET_SO) $(LIBCOEVENT_LIB_PATH)
+	install -c $(TARGET_A) $(LIBCOEVENT_LIB_PATH)
+	install -c $(LIBCO_TARGET) $(LIBCOEVENT_LIB_PATH)
+	@ls include | xargs -I [] install -m 0664 include/[] $(LIBCOEVENT_LIB_HEADER_PATH)
+	@install -m 0664 $(LIBCO_HEADER) $(LIBCOEVENT_LIB_HEADER_PATH)
 	@echo "<< libcoevent installed >>"
 
 # uninstall
 .PHONY:uninstall
 uninstall:
-	-rm -f $(LIBCO_LIB_PATH)/$(TARGET_SO_FILE_NAME)
-	-rm -f $(LIBCO_LIB_PATH)/$(TARGET_A_FILE_NAME)
-	-rm -f $(LIBCO_LIB_PATH_CONF_DIR)/$(LIBCO_LIB_DIR_NAME)
-	-@ls include | xargs -I [] rm -f $(LIBCO_LIB_HEADER_PATH)/[]
+	-rm -f $(LIBCOEVENT_LIB_PATH)/$(TARGET_SO_FILE_NAME)
+	-rm -f $(LIBCOEVENT_LIB_PATH)/$(TARGET_A_FILE_NAME)
+	-rm -f $(LIBCOEVENT_LIB_PATH_CONF_DIR)/$(LIBCOEVENT_LIB_DIR_NAME)
+	-rm -f $(LIBCOEVENT_LIB_PATH_CONF_DIR)/$(LIBCO_A_FILE_NAME)
+	-@ls include | xargs -I [] rm -f $(LIBCOEVENT_LIB_HEADER_PATH)/[]
+	-@rm -f $(LIBCOEVENT_LIB_HEADER_PATH)/$(LIBCO_HEADER_FILE_NAME)
 	@echo "<< libcoevent uninstalled >>"
 
 # libcoevent
