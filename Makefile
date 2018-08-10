@@ -25,8 +25,10 @@ LIBCO_GIT_URL = https://github.com/Tencent/libco.git
 # install parameters
 LIBCOEVENT_LIB_PATH_CONF_DIR = /etc/ld.so.conf.d/
 LIBCOEVENT_LIB_DIR_NAME = libcoevent.conf
-LIBCOEVENT_LIB_PATH = /usr/local/lib
+libdir ?= ./Makefile
+LIBCOEVENT_LIB_PATH = $(libdir)
 LIBCOEVENT_LIB_HEADER_PATH = /usr/include
+
 
 # flagsst 
 CFLAGS += -Wall -g -fPIC -lpthread -I./include -I./src -I./$(LIBCO_DIR) -levent -DDEBUG_FLAG
@@ -66,8 +68,11 @@ all: $(LIBCO_TARGET) $(TARGET_SO) $(TARGET_A)
 # install
 .PHONY:install
 install:
-	@echo "" > $(LIBCOEVENT_LIB_PATH_CONF_DIR)/$(LIBCOEVENT_LIB_DIR_NAME)
-	@echo "# libcoevent default configuration" >> $(LIBCOEVENT_LIB_PATH_CONF_DIR)/$(LIBCOEVENT_LIB_DIR_NAME)
+	@if [ ! -d $(LIBCOEVENT_LIB_PATH) ]; then\
+		echo "Please specify parameter: libdir";\
+		exit 1;\
+	fi
+	@echo "# libcoevent default configuration" > $(LIBCOEVENT_LIB_PATH_CONF_DIR)/$(LIBCOEVENT_LIB_DIR_NAME)
 	@echo "$(LIBCOEVENT_LIB_PATH)" >> $(LIBCOEVENT_LIB_PATH_CONF_DIR)/$(LIBCOEVENT_LIB_DIR_NAME)
 	install -c $(TARGET_SO) $(LIBCOEVENT_LIB_PATH)
 	install -c $(TARGET_A) $(LIBCOEVENT_LIB_PATH)
@@ -79,6 +84,10 @@ install:
 # uninstall
 .PHONY:uninstall
 uninstall:
+	@if [ ! -d $(LIBCOEVENT_LIB_PATH) ]; then\
+		echo "Please specify parameter: libdir";\
+		exit 1;\
+	fi
 	-rm -f $(LIBCOEVENT_LIB_PATH)/$(TARGET_SO_FILE_NAME)
 	-rm -f $(LIBCOEVENT_LIB_PATH)/$(TARGET_A_FILE_NAME)
 	-rm -f $(LIBCOEVENT_LIB_PATH_CONF_DIR)/$(LIBCOEVENT_LIB_DIR_NAME)
@@ -158,5 +167,4 @@ distclean: clean
 .PHONY: test
 test:
 	@echo 'Now build test programs'
-	make -C test/server
-
+	@echo LIBCOEVENT_LIB_PATH=$(LIBCOEVENT_LIB_PATH)
