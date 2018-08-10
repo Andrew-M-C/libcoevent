@@ -59,8 +59,11 @@ static void _cgi_session(evutil_socket_t fd, Event *event, void *arg)
     ::andrewmc::cpptools::Data data_buff;
     struct Error status;
     size_t data_len = 0;
+    TCPServer *server = (TCPServer *)arg;
+    int port = server->port();
 
     data_buff.ensure_buff_capacity(10240);
+    LOG("Server port: %d", port);
     LOG("Remote client address: %s:%u", session.remote_addr().c_str(), session.remote_port());
 
     // recv data
@@ -155,6 +158,11 @@ static void _cgi_session(evutil_socket_t fd, Event *event, void *arg)
             data_buff.append(str_buff, data_len);
         }
 
+        {
+            data_len = sprintf(str_buff, ", \"Server ID\":\"%d\"", port);
+            data_buff.append(str_buff, data_len);
+        }
+
         const char tail_str[] = "}\r\n\r\n";
         data_buff.append(tail_str, sizeof(tail_str) - 1);
 
@@ -167,7 +175,7 @@ static void _cgi_session(evutil_socket_t fd, Event *event, void *arg)
         LOG("Now close session to simulate afterward operation");
         session.disconnect();
 
-        for (unsigned count = 5; count > 0; count --)
+        for (unsigned count = 3; count > 0; count --)
         {
             session.sleep(1);
             LOG("Countdown %u", count - 1);
@@ -195,8 +203,19 @@ int main(int argc, char *argv[])
     Base *base = new Base;
     Error status;
     TCPServer *server = new TCPServer;
+    unsigned port = _CGI_PORT;
 
-    status = server->init_session_mode(base, _cgi_session, NetIPv4, _CGI_PORT, server);
+    if (argc > 1)
+    {
+        port = (unsigned)strtol(argv[1], NULL, 10);
+
+        if (!(port > 0 && port < 65536)) {
+            port = _CGI_PORT;
+        }
+    }
+    LOG("CGI port %u", port);
+
+    status = server->init_session_mode(base, _cgi_session, NetIPv4, port, server);
     if (FALSE == status.is_ok()) {
         LOG("Init CGI server failed: %s", status.c_err_msg());
         goto END;

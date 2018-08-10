@@ -8,14 +8,21 @@ AR  = ar
 
 # target
 BIN_DIR = ./bin
-TARGET_SO = $(BIN_DIR)/libcoevent.so
-TARGET_A = $(BIN_DIR)/libcoevent.a
+TARGET_SO_FILE_NAME = libcoevent.so
+TARGET_A_FILE_NAME = libcoevent.a
+TARGET_SO = $(BIN_DIR)/$(TARGET_SO_FILE_NAME)
+TARGET_A = $(BIN_DIR)/$(TARGET_A_FILE_NAME)
 
 # directories
 LIBCO_DIR = ./libco_from_git
 LIBCO_BIN = $(LIBCO_DIR)/lib
 LIBCO_TARGET = $(LIBCO_BIN)/libcolib.a
 LIBCO_GIT_URL = https://github.com/Tencent/libco.git
+
+# install parameters
+LIBCO_LIB_PATH_CONF_DIR = /etc/ld.so.conf.d/
+LIBCO_LIB_DIR_NAME = libcoevent.conf
+LIBCO_LIB_PATH = /usr/local/lib
 
 # flagsst 
 CFLAGS += -Wall -g -fPIC -lpthread -I./include -I./src -I./$(LIBCO_DIR) -levent -DDEBUG_FLAG
@@ -51,6 +58,24 @@ export LD
 .PHONY:all
 all: $(LIBCO_TARGET) $(TARGET_SO) $(TARGET_A)
 	@echo "	<< libcoevent made >>"
+
+# install
+.PHONY:install
+install: all
+	@echo "" > $(LIBCO_LIB_PATH_CONF_DIR)/$(LIBCO_LIB_DIR_NAME)
+	@echo "# libcoevent default configuration" >> $(LIBCO_LIB_PATH_CONF_DIR)/$(LIBCO_LIB_DIR_NAME)
+	@echo "$(LIBCO_LIB_PATH)" >> $(LIBCO_LIB_PATH_CONF_DIR)/$(LIBCO_LIB_DIR_NAME)
+	@install -c $(TARGET_SO) $(LIBCO_LIB_PATH)
+	@install -c $(TARGET_A) $(LIBCO_LIB_PATH)
+	@echo "<< libcoevent installed >>"
+
+# uninstall
+.PHONY:uninstall
+uninstall:
+	rm -f $(LIBCO_LIB_PATH)/$(TARGET_SO_FILE_NAME)
+	rm -f $(LIBCO_LIB_PATH)/$(TARGET_A_FILE_NAME)
+	rm -f $(LIBCO_LIB_PATH_CONF_DIR)/$(LIBCO_LIB_DIR_NAME)
+	@echo "<< libcoevent uninstalled >>"
 
 # libcoevent
 $(TARGET_SO): $(BIN_DIR) $(C_OBJS) $(CPP_OBJS) $(ASM_OBJS)
