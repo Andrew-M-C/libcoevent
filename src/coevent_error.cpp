@@ -33,8 +33,8 @@ const char *g_error_msg_list[] = {
 
     "object is not initialized",
     "object not found",
-    "client already connected",
-    "client not connected",
+    "TCP already connected",
+    "TCP not connected",
 
     "cannot find approperate DNS server IP",
 
@@ -72,24 +72,6 @@ BOOL Error::is_timeout()
 }
 
 
-void Error::set_ssize_t(ssize_t val)
-{
-    if (val >= 0) {
-        set_sys_errno(0);
-        _ssize_ret = val;
-    }
-    else {
-        set_sys_errno((int)val);
-    }
-}
-
-
-ssize_t Error::ssize()
-{
-    return _ssize_ret;
-}
-
-
 void Error::clear_err()
 {
     set_sys_errno(0);
@@ -101,7 +83,6 @@ void Error::set_sys_errno()
 {
     _sys_errno = (uint16_t)errno;
     _lib_errno = 0;
-    _ssize_ret = 0;
     return;
 }
 
@@ -110,7 +91,6 @@ void Error::set_sys_errno(int sys_errno)
 {
     _sys_errno = (uint16_t)sys_errno;
     _lib_errno = 0;
-    _ssize_ret = 0;
     return;
 }
 
@@ -123,7 +103,6 @@ void Error::set_app_errno(ErrCode_t lib_errno, const char *c_err_msg)
 
     _sys_errno = (0 == lib_errno) ? 0 : 0xFFFF;
     _lib_errno = (uint16_t)lib_errno;
-    _ssize_ret = 0;
 
     if ((NULL == c_err_msg)
         || ('\0' == *c_err_msg))

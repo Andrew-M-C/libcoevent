@@ -151,6 +151,14 @@ int andrewmc::libcoevent::set_fd_nonblock(int fd)
 }
 
 
+int andrewmc::libcoevent::set_fd_reuseaddr(int fd)
+{
+    int enable = 1;
+    int ret = setsockopt(fd, SOL_SOCKET, SO_REUSEADDR, &enable, sizeof(enable));
+    return ret;
+}
+
+
 ssize_t andrewmc::libcoevent::recv_from(int sockfd, void *buf, size_t len, int flags, struct sockaddr *src_addr, socklen_t *addrlen)
 {
     ssize_t ret = recvfrom(sockfd, buf, len, flags, src_addr, addrlen);

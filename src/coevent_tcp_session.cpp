@@ -295,11 +295,15 @@ struct Error TCPItnlSession::recv_in_timeval(void *data_out, const size_t len_li
     if (NULL == data_out) {
         ERROR("no recv data buffer spectied");
         _status.set_app_errno(ERR_PARA_NULL);
-        return _status;
+        goto END;
     }
-    if (_fd <= 0 || NULL == _libevent_what_storage) {
+    if (NULL == _libevent_what_storage) {
         _status.set_app_errno(ERR_NOT_INITIALIZED);
-        return _status;
+        goto END;
+    }
+    if (_fd <= 0) {
+        _status.set_app_errno(ERR_NOT_CONNECTED);
+        goto END;
     }
     _status.clear_err();
 
@@ -357,6 +361,7 @@ struct Error TCPItnlSession::recv_in_timeval(void *data_out, const size_t len_li
     }
 
     // write read data len and return
+END:
     if (len_out) {
         *len_out = (recv_len > 0) ? recv_len : 0;
     }
@@ -383,6 +388,38 @@ struct Error TCPItnlSession::recv(void *data_out, const size_t len_limit, size_t
 
 
 #endif  // end of __RECV_FUNCTION
+
+
+// ==========
+#define __DISCONNECT_FUNCTION
+#ifdef __DISCONNECT_FUNCTION
+
+struct Error TCPItnlSession::disconnect()
+{
+    _status.clear_err();
+    if (_fd <= 0) {
+        _fd = 0;
+        return _status;
+    }
+
+    struct _EventArg *arg = (struct _EventArg *)_event_arg;
+    if (NULL == arg) {
+        _status.set_app_errno(ERR_NOT_INITIALIZED);
+        return _status;
+    }
+
+    close(_fd);
+    _fd = 0;
+
+    int libevent_stat = event_assign(_event, _owner_base->event_base(), -1, EV_TIMEOUT | EV_READ, _libevent_callback, arg);
+    if (libevent_stat) {
+        _status.set_app_errno(ERR_EVENT_UNEXPECTED_ERROR);
+    }
+    return _status;
+}
+
+
+#endif
 
 
 // ==========

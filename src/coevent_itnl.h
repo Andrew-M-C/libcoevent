@@ -50,6 +50,7 @@ BOOL is_coroutine_started(const struct stCoRoutine_t *routine);
 
 // fd settings
 int set_fd_nonblock(int fd);
+int set_fd_reuseaddr(int fd);
 
 // recvfrom()
 ssize_t recv_from(int sockfd, void *buf, size_t len, int flags, struct sockaddr *src_addr, socklen_t *addrlen);
@@ -232,6 +233,8 @@ public:
     struct Error recv(void *data_out, const size_t len_limit, size_t *len_out_nullable, double timeout_seconds = 0);
     struct Error recv_in_timeval(void *data_out, const size_t len_limit, size_t *len_out_nullable, const struct timeval &timeout);
     struct Error recv_in_mimlisecs(void *data_out, const size_t len_limit, size_t *len_out_nullable, unsigned timeout_milisecs);
+
+    struct Error disconnect(void);
 
     struct Error sleep(double seconds);
     struct Error sleep(struct timeval &sleep_time);

@@ -1,5 +1,6 @@
 *.d
 *.o
+*.a
 *.so
 __pycache__
 .DS_Store
@@ -7,3 +8,4 @@ __pycache__
 libco_from_git
 bin/
 test/server/server
+test/cgi-server/cgi-server
