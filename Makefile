@@ -31,7 +31,7 @@ LIBCOEVENT_LIB_HEADER_PATH = /usr/include
 
 
 # flagsst 
-CFLAGS += -Wall -g -fPIC -lpthread -I./include -I./src -I./$(LIBCO_DIR) -levent -DDEBUG_FLAG
+CFLAGS += -Wall -g -fPIC -lpthread -I./include -I./src -I./$(LIBCO_DIR) -levent
 CPPFLAGS += $(CFLAGS)
 LDFLAGS += -lpthread -lm -lrt
 
