@@ -302,6 +302,43 @@ private:
     void _clear();
 };
 
+
+// MySQL client
+#if ENABLE_MARIADB
+class MySQLItnlClient : public MySQLClient {
+private:
+    void            *_event_arg;
+    BOOL            _is_connected;
+    Procedure       *_owner_server;
+    uint32_t        *_libevent_what_storage;
+public:
+    MySQLItnlClient();
+    virtual ~MySQLItnlClient();
+
+    NetType_t network_type();
+
+    struct Error init(Procedure *server, struct stCoRoutine_t *coroutine);
+
+    struct Error connect_DB(const char *address = NULL,
+                            const char *user = NULL,
+                            const char *password = NULL,
+                            const char *database = NULL,
+                            unsigned port = 0,
+                            BOOL unix_socket = FALSE);
+
+    struct Error query(const char *query, size_t length = 0xFFFFFFFF);
+    MYSQL_RES *store_result();
+    MYSQL_ROW *fetch_row(MYSQL_RES *result);
+    struct Error free_result(MYSQL_RES *result);
+    struct Error close();
+
+    struct timeval timeout_timeval(void) const;
+    double timeout(void) const;
+
+    Procedure *owner_server();
+};
+#endif
+
 }   // end of namespace libcoevent
 }   // end of namespace andrewmc
 #endif  // EOF

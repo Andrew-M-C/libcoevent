@@ -83,6 +83,7 @@ void Error::set_sys_errno()
 {
     _sys_errno = (uint16_t)errno;
     _lib_errno = 0;
+    _mysql_errno = 0;
     return;
 }
 
@@ -91,7 +92,30 @@ void Error::set_sys_errno(int sys_errno)
 {
     _sys_errno = (uint16_t)sys_errno;
     _lib_errno = 0;
+    _mysql_errno = 0;
     return;
+}
+
+
+void Error::set_mysql_errno(int mysql_errno, const char *c_err_msg)
+{
+    if (0 == mysql_errno) {
+        set_sys_errno(0);
+        return;
+    }
+
+    _sys_errno = 0xFFFF;
+    _lib_errno = 0;
+    _mysql_errno = (uint16_t)mysql_errno;
+
+    if (NULL == c_err_msg
+        || '\0' == c_err_msg)
+    {
+        c_err_msg = "Unknown MySQL error";
+    }
+    else {
+        _err_msg = c_err_msg;
+    }
 }
 
 
@@ -103,6 +127,7 @@ void Error::set_app_errno(ErrCode_t lib_errno, const char *c_err_msg)
 
     _sys_errno = (0 == lib_errno) ? 0 : 0xFFFF;
     _lib_errno = (uint16_t)lib_errno;
+    _mysql_errno = 0;
 
     if ((NULL == c_err_msg)
         || ('\0' == *c_err_msg))
@@ -149,10 +174,11 @@ const char *Error::c_err_msg()
 }
 
 
-uint32_t Error::err_code()
+uint64_t Error::err_code()
 {
-    uint32_t ret = (uint32_t)_sys_errno;
-    ret += ((uint32_t)_lib_errno) << 16;
+    uint64_t ret = (uint64_t)_sys_errno;
+    ret += ((uint64_t)_lib_errno) << 16;
+    ret += ((uint64_t)_mysql_errno) << 32;
     return ret;
 }
 
@@ -166,6 +192,12 @@ uint32_t Error::app_err_code()
 uint32_t Error::sys_err_code()
 {
     return _sys_errno;
+}
+
+
+uint32_t Error::mysql_err_code()
+{
+    return _mysql_errno;
 }
 
 #endif  // end of Error

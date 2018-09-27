@@ -1,4 +1,5 @@
 // file encoding: UTF-8
+// libcoevent base classes declaration
 
 #ifndef __CO_EVENT_VIRTUAL_H__
 #define __CO_EVENT_VIRTUAL_H__

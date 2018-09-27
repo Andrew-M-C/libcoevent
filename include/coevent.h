@@ -11,6 +11,10 @@
 #include "coevent_dns.h"
 #include "coevent_tcp.h"
 
+#if ENABLE_MARIADB
+#include "coevent_mysql.h"
+#endif
+
 namespace andrewmc {
 namespace libcoevent {
 

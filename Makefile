@@ -30,10 +30,13 @@ LIBCOEVENT_LIB_PATH = $(libdir)
 LIBCOEVENT_LIB_HEADER_PATH = /usr/include
 
 
-# flagsst 
+# flags
 CFLAGS += -Wall -g -fPIC -lpthread -I./include -I./src -I./$(LIBCO_DIR) -levent -DDEBUG_FLAG
 CPPFLAGS += $(CFLAGS)
 LDFLAGS += -lpthread -lm -lrt
+
+# enable MariaDB
+CFLAGS += -DENABLE_MARIADB=1 -I/usr/include/mariadb
 
 # source files
 C_SRCS = $(wildcard ./src/*.c)

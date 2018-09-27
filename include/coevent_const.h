@@ -38,37 +38,6 @@ typedef enum {
 // coroutine function
 typedef void (*WorkerFunc)(evutil_socket_t, Event *, void *);
 
-
-// error codes
-typedef enum {
-    ERR_SUCCESS = 0,
-    ERR_EVENT_BASE_NEW,
-    ERR_EVENT_BASE_DISPATCH,
-    ERR_EVENT_EVENT_NEW,
-    ERR_EVENT_BASE_NO_EVENT_PANDING,
-    ERR_EVENT_UNEXPECTED_ERROR,
-
-    ERR_LIBCO_CREATE,
-    ERR_PARA_NULL,
-    ERR_PARA_ILLEGAL,
-
-    ERR_NETWORK_TYPE_ILLEGAL,
-    ERR_BIND_PATH_ILLEGAL,
-
-    ERR_INTERRUPTED_SLEEP,
-    ERR_TIMEOUT,
-    ERR_SIGNAL,
-
-    ERR_NOT_INITIALIZED,
-    ERR_OBJ_NOT_FOUND,
-    ERR_ALREADY_CONNECTED,
-    ERR_NOT_CONNECTED,
-
-    ERR_DNS_SERVER_IP_NOT_FOUND,
-
-    ERR_UNKNOWN     // should place at last
-} ErrCode_t;
-
 }   // end of namespace libcoevent
 }   // end of namespace andrewmc
 #endif  // EOF
